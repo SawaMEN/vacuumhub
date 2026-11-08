@@ -63,6 +63,13 @@ func TestAdminAuditAndReadiness(t *testing.T) {
 		!strings.Contains(rows[0]["path"].(string),"/api/v1/admin/models") {
 		t.Fatalf("bad audit %+v",rows[0])
 	}
+	audit := httpReq(t,h,"GET","/api/v1/admin/audit?limit=10",nil,true,"")
+	if audit.Code != 200 || !strings.Contains(audit.Body.String(),"test-audit-model") {
+		t.Fatalf("audit endpoint: %d %s",audit.Code,audit.Body.String())
+	}
+	if unauthorized := httpReq(t,h,"GET","/api/v1/admin/audit",nil,false,"");unauthorized.Code != 401 {
+		t.Fatalf("audit exposed without token: %d",unauthorized.Code)
+	}
 	if err:=os.WriteFile(filepath.Join(a.WebDir, "admin.html"), []byte("<!doctype html><title>Admin</title>"), 0600); err != nil {t.Fatal(err)}
 	r=httpReq(t,h,"GET","/admin.html",nil,false,"")
 	if r.Header().Get("Cache-Control")!="no-store" {t.Fatalf("admin page may be cached")}
