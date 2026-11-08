@@ -64,7 +64,7 @@ func TestAdminAuditAndReadiness(t *testing.T) {
 		t.Fatalf("bad audit %+v",rows[0])
 	}
 	audit := httpReq(t,h,"GET","/api/v1/admin/audit?limit=10",nil,true,"")
-	if audit.Code != 200 || !strings.Contains(audit.Body.String(),"test-audit-model") {
+	if audit.Code != 200 || !strings.Contains(audit.Body.String(),"/api/v1/admin/models") {
 		t.Fatalf("audit endpoint: %d %s",audit.Code,audit.Body.String())
 	}
 	if unauthorized := httpReq(t,h,"GET","/api/v1/admin/audit",nil,false,"");unauthorized.Code != 401 {
