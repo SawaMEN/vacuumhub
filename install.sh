@@ -196,7 +196,8 @@ prepare_tls(){
  fi
 }
 write_environment(){
- local output="$1"
+ local output="$1" LISTEN_INTERFACE='0.0.0.0'
+ [[ "$PUBLIC_HOST" != *:* ]] || LISTEN_INTERFACE='::'
  local token="$(get_config ADMIN_API_TOKEN)"
  [[ "$token" =~ ^[0-9a-f]{64}$ ]] || token="$(openssl rand -hex 32)"
  cat > "$output" <<ENV
@@ -206,7 +207,7 @@ ADMIN_BASIC_USER=$ADMIN_BASIC_USER
 ADMIN_BASIC_PASSWORD_B64=$PASSWORD_B64
 ACCESS_MODE=$ACCESS_MODE
 PUBLIC_HOST=$PUBLIC_HOST
-LISTEN_HOST=0.0.0.0
+LISTEN_HOST=$LISTEN_INTERFACE
 LISTEN_PORT=$LISTEN_PORT
 TLS_CERT_FILE=/etc/vacuumhub/tls/cert.pem
 TLS_KEY_FILE=/etc/vacuumhub/tls/key.pem
@@ -255,7 +256,8 @@ fetch_package(){
 backup_old(){
  local path
  mkdir -p "$TMP/rollback"
- for path in "$BIN" "$MANAGER" "$SERVICE" "$ENV_FILE" \
+ for path in "$BIN" "$MANAGER" "$SERVICE" "$ENV_FILE" "$INSTALL_DIR/install.sh" \
+  "$INSTALL_DIR/scripts/backup-native.sh" "$INSTALL_DIR/scripts/restore-drill-native.sh" "$INSTALL_DIR/scripts/restore-native.sh" \
   /etc/systemd/system/vacuumhub-cert-renew.service /etc/systemd/system/vacuumhub-cert-renew.timer;do
   [[ ! -f "$path" ]] || { mkdir -p "$TMP/rollback$(dirname "$path")";cp -p "$path" "$TMP/rollback$path"; }
  done
@@ -265,7 +267,8 @@ backup_old(){
 restore_old(){
  local path
  systemctl stop vacuumhub.service 2>/dev/null || true
- for path in "$BIN" "$MANAGER" "$SERVICE" "$ENV_FILE" \
+ for path in "$BIN" "$MANAGER" "$SERVICE" "$ENV_FILE" "$INSTALL_DIR/install.sh" \
+  "$INSTALL_DIR/scripts/backup-native.sh" "$INSTALL_DIR/scripts/restore-drill-native.sh" "$INSTALL_DIR/scripts/restore-native.sh" \
  /etc/systemd/system/vacuumhub-cert-renew.service /etc/systemd/system/vacuumhub-cert-renew.timer;do
   if [[ -f "$TMP/rollback$path" ]];then cp -p "$TMP/rollback$path" "$path"
   else rm -f "$path";fi
