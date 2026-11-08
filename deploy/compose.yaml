@@ -6,6 +6,8 @@ services:
     restart: unless-stopped
     environment:
       ADMIN_API_TOKEN: ${ADMIN_API_TOKEN:?Set ADMIN_API_TOKEN in .env}
+      FIRMWARE_CLAMD_ADDR: ${FIRMWARE_CLAMD_ADDR:-}
+      FIRMWARE_TRUSTED_KEYS: ${FIRMWARE_TRUSTED_KEYS:-}
     volumes:
       - vacuumhub_data:/data
     networks:
