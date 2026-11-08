@@ -1,0 +1,13 @@
+# CI BUILD ONLY. End-user installation is a standalone binary + systemd, no Docker.
+FROM --platform=$TARGETPLATFORM golang:1.23-alpine AS build
+RUN apk add --no-cache gcc musl-dev sqlite-dev sqlite-static
+WORKDIR /src
+COPY go.mod ./
+COPY cmd ./cmd
+COPY internal ./internal
+COPY web ./web
+RUN CGO_ENABLED=1 go build -trimpath -tags 'netgo osusergo' \
+    -ldflags='-s -w -linkmode external -extldflags "-static"' \
+    -o /out/vacuumhub ./cmd/vacuumhub
+FROM scratch
+COPY --from=build /out/vacuumhub /vacuumhub

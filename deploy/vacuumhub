@@ -1,0 +1,72 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+SERVICE=vacuumhub.service
+INSTALLER=/opt/vacuumhub/install.sh
+CONFIG=/etc/vacuumhub/environment
+
+require_root() {
+  [[ ${EUID:-$(id -u)} -eq 0 ]] || { echo 'Запустите через sudo.' >&2; exit 1; }
+}
+value() {
+  [[ -r "$CONFIG" ]] || return 0
+  sed -n "s/^${1}=//p" "$CONFIG" | head -n 1
+}
+panel_url() {
+  local host port
+  host="$(value PUBLIC_HOST)"; port="$(value LISTEN_PORT)"
+  [[ -n "$host" ]] || return 0
+  [[ "$host" != *:* ]] || host="[$host]"
+  if [[ "$port" == 443 ]]; then printf 'https://%s\n' "$host"
+  else printf 'https://%s:%s\n' "$host" "${port:-8443}"; fi
+}
+status() {
+  echo "VacuumHub: $(systemctl is-active "$SERVICE" 2>/dev/null || true)"
+  if [[ -f "$CONFIG" ]]; then
+    echo "Режим: $(value ACCESS_MODE)"
+    echo "Адрес: $(panel_url)"
+    echo "Порт: $(value LISTEN_PORT)"
+  else
+    echo 'VacuumHub ещё не установлен.'
+  fi
+}
+menu() {
+  local choice
+  while true; do
+    echo
+    echo '════════ VacuumHub ════════'
+    status
+    printf '\n1) Установить / обновить\n2) Настроить IP или домен\n3) Запустить\n4) Остановить\n5) Перезапустить\n6) Журнал службы\n7) Изменить логин и пароль\n8) Резервная копия\n9) Проверить восстановление\n10) Удалить\n0) Выход\n'
+    read -r -p 'Выберите действие: ' choice </dev/tty || return 0
+    case "$choice" in
+      1) bash "$INSTALLER" --update ;;
+      2) bash "$INSTALLER" --configure ;;
+      3) systemctl start "$SERVICE" ;;
+      4) systemctl stop "$SERVICE" ;;
+      5) systemctl restart "$SERVICE" ;;
+      6) journalctl -u "$SERVICE" -n 100 --no-pager ;;
+      7) bash "$INSTALLER" --credentials ;;
+      8) bash /opt/vacuumhub/scripts/backup-native.sh ;;
+      9) local archive; read -r -p 'Полный путь к архиву: ' archive </dev/tty; bash /opt/vacuumhub/scripts/restore-drill-native.sh "$archive" ;;
+      10) bash "$INSTALLER" --uninstall ;;
+      0) return 0 ;;
+      *) echo 'Неизвестный пункт.' >&2 ;;
+    esac
+  done
+}
+main() {
+  require_root
+  case "${1:-menu}" in
+    menu) menu ;;
+    status) status ;;
+    start|stop|restart) systemctl "$1" "$SERVICE" ;;
+    logs) journalctl -u "$SERVICE" -n 100 --no-pager ;;
+    logs-follow) journalctl -u "$SERVICE" -f ;;
+    update|install|configure|credentials|uninstall) bash "$INSTALLER" "--$1" ;;
+    backup) bash /opt/vacuumhub/scripts/backup-native.sh ;;
+    restore-test) shift; bash /opt/vacuumhub/scripts/restore-drill-native.sh "${1:?Provide an archive}" ;;
+    restore) shift; bash /opt/vacuumhub/scripts/restore-native.sh "$@" ;;
+    info) status ;;
+    *) echo 'Команды: status start stop restart logs logs-follow update configure credentials backup restore-test <archive> restore <archive> --confirm-overwrite uninstall' >&2; exit 2 ;;
+  esac
+}
+if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then main "$@"; fi

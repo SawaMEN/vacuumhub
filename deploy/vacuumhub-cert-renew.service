@@ -1,0 +1,8 @@
+[Unit]
+Description=Renew VacuumHub certificate (when managed by Certbot)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/opt/vacuumhub/install.sh --renew-cert

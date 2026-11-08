@@ -7,21 +7,19 @@
 ### Схема
 
 ```text
-Браузер (Android/iOS/PC)
-           |
-      HTTPS / Caddy
-           |
-      Go HTTP-сервер
-     /      |       \
-   Web    REST API   Admin
-             |
-        +----+------+
-        |           |
-     SQLite WAL   /data/assets
-     метаданные   файлы вне web-root
+Браузер (ПК / телефон)
+       │
+ HTTPS по публичному IP или домену, порт 8443 (настраивается)
+       │
+  Go-бинарник в systemd, без Docker
+       ├── встроенный веб-сайт (go:embed)
+       ├── REST API
+       ├── Basic Auth (админка) + CSRF-защита
+       └── SQLite WAL: /var/lib/vacuumhub/vacuumhub.sqlite
+                        /var/lib/vacuumhub/assets/
 ```
 
-Схема оптимизирована под один VPS: не нужны Kubernetes, Redis, PostgreSQL или Node.js в production. Go-приложение раздаёт API и статический интерфейс; Caddy отвечает за TLS. SQLite подключается через системную библиотеку libsqlite3, не слушает TCP и хранится в постоянном Docker volume.
+Нативная система работает на одном Linux VDS: не требуются Docker, Caddy, Node.js или отдельный HTTP-прокси. Статический релиз собирается в CI с musl + SQLite и включает веб-ресурсы. TLS завершается непосредственно в Go HTTP-сервере, сертификат и ключ хранятся в `/etc/vacuumhub/tls`. Установщик поддерживает только публичный IP или домен, без режима локального запуска.
 
 ## Сущности
 
@@ -67,7 +65,7 @@ SHA-256 проверяет только целостность файла. Он 
 | GET | /api/v1/admin/assets | Очередь модерации |
 | PATCH | /api/v1/admin/assets/{id} | Одобрить или отклонить |
 
-Все административные маршруты требуют `Authorization: Bearer ADMIN_API_TOKEN`. В MVP один администратор. Нет пользовательской регистрации, ролей, MFA или журнала модерации.
+В нативном режиме административные маршруты и `/admin.html` защищены HTTP Basic поверх HTTPS, браузерные изменяющие запросы требуют `X-Vacuumhub-Request: same-origin`. Режим токена остаётся только для старых конфигураций и API-тестов. Есть журнал `admin_audit`; RBAC и MFA пока нет.
 
 ## Структура исходников
 
@@ -76,7 +74,7 @@ cmd/vacuumhub/              старт приложения
 internal/app/               HTTP маршруты, загрузка и модерация
 internal/store/             SQLite, миграции, демонстрационный каталог
 web/                        статический сайт и админ-панель
-deploy/                     Dockerfile, Compose, Caddyfile
+deploy/                     systemd-служба, таймер продления, управляющая команда
 docs/                       архитектура, безопасность, эксплуатация, карта
 .github/workflows/          CI
 ```

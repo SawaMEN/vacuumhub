@@ -14,12 +14,12 @@
 
 ## ClamAV
 
-Переменная `FIRMWARE_CLAMD_ADDR` принимает `host:port` или `unix:/path/to/clamd.sock`. В Docker-контейнере адрес должен быть доступен именно **из сети контейнера**. ClamAV может работать на отдельном узле или в отдельном контейнере. Не выставляйте порт 3310 в Интернет.
+Переменная `FIRMWARE_CLAMD_ADDR` принимает `host:port` или `unix:/path/to/clamd.sock`. В нативной установке ClamAV запускается отдельной системной службой либо доступен по защищённой внутренней сети. Лучший вариант на одном VDS — Unix-сокет `unix:/run/clamav/clamd.ctl`, доступный системному пользователю `vacuumhub`. Не выставляйте порт 3310 в Интернет; на слабом VDS может потребоваться внешний сканер.
 
 Пример переменных:
 
 ```env
-FIRMWARE_CLAMD_ADDR=clamav:3310
+FIRMWARE_CLAMD_ADDR=unix:/run/clamav/clamd.ctl
 # Optional. Only public keys, no private keys. key-id:64-character-hex; comma-separated:
 FIRMWARE_TRUSTED_KEYS=
 ```

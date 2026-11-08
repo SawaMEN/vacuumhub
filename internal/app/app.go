@@ -19,6 +19,7 @@ import (
 	"time"
 
 	"github.com/SawaMEN/vacuumhub/internal/store"
+	webassets "github.com/SawaMEN/vacuumhub/web"
 )
 
 const maxUpload = 100 << 20 // 100 MiB
@@ -32,6 +33,7 @@ type App struct {
 	failures                       authAttempts
 	firmwareMu                     sync.Mutex
 	StorageDir, AdminToken, WebDir string
+	AdminUsername, AdminPassword string
 }
 
 func New(db *store.DB, storageDir, adminToken, webDir string) (*App, error) {
@@ -41,11 +43,14 @@ func New(db *store.DB, storageDir, adminToken, webDir string) (*App, error) {
 	if err := os.MkdirAll(storageDir, 0700); err != nil {
 		return nil, err
 	}
-	return &App{DB: db, StorageDir: storageDir, AdminToken: adminToken, WebDir: webDir, TrustProxyHeaders: readProxyConfig()}, nil
+	user, pass, err := loadBasicCredentials()
+	if err != nil { return nil, err }
+	return &App{DB: db, StorageDir: storageDir, AdminToken: adminToken, WebDir: webDir, AdminUsername: user, AdminPassword: pass, TrustProxyHeaders: readProxyConfig()}, nil
 }
 
 func (a *App) Handler() http.Handler {
 	mux := http.NewServeMux()
+	mux.HandleFunc("GET /api/v1/auth-mode", func(w http.ResponseWriter, r *http.Request) { mode := "token"; if a.AdminUsername != "" {mode = "basic"}; reply(w, 200, map[string]string{"mode": mode}) })
 	mux.HandleFunc("GET /api/v1/health", func(w http.ResponseWriter, r *http.Request) { reply(w, http.StatusOK, map[string]any{"status": "ok"}) })
 	mux.HandleFunc("GET /api/v1/ready", a.readiness)
 	mux.HandleFunc("GET /api/v1/manufacturers", a.manufacturers)
@@ -70,11 +75,15 @@ func (a *App) Handler() http.Handler {
 	mux.HandleFunc("GET /api/v1/admin/assets", a.admin(a.adminAssets))
 	mux.HandleFunc("GET /api/v1/admin/audit", a.admin(a.adminAudit))
 	mux.HandleFunc("PATCH /api/v1/admin/assets/{id}", a.admin(a.review))
-	mux.Handle("GET /", http.FileServer(http.Dir(a.WebDir)))
-	return headers(mux)
+	if a.WebDir == "" {
+		mux.Handle("GET /", http.FileServer(http.FS(webassets.Files)))
+	} else {
+		mux.Handle("GET /", http.FileServer(http.Dir(a.WebDir)))
+	}
+	return a.headers(mux)
 }
 
-func headers(next http.Handler) http.Handler {
+func (a *App) headers(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("X-Content-Type-Options", "nosniff")
 		w.Header().Set("Referrer-Policy", "no-referrer")
@@ -84,6 +93,10 @@ func headers(next http.Handler) http.Handler {
 			w.Header().Set("Cache-Control", "no-store")
 		}
 		w.Header().Set("Content-Security-Policy", "default-src 'self'; object-src 'none'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'")
+		if r.URL.Path == "/admin.html" && a.AdminUsername != "" && !a.basicAuthenticated(r) {
+			a.basicChallenge(w)
+			return
+		}
 		next.ServeHTTP(w, r)
 	})
 }
