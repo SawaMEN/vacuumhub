@@ -101,7 +101,9 @@ func (a *App) admin(next http.HandlerFunc) http.HandlerFunc {
 			problem(w, http.StatusTooManyRequests, "too many failed authentication attempts")
 			return
 		}
-		if !validAdminToken(r.Header.Get("Authorization"), a.AdminToken) {
+		tokenHeader := r.Header.Get("X-Vacuumhub-Token")
+		if tokenHeader != "" { tokenHeader = "Bearer " + tokenHeader } else { tokenHeader = r.Header.Get("Authorization") }
+		if !validAdminToken(tokenHeader, a.AdminToken) {
 			a.failures.failure(source)
 			problem(w, http.StatusUnauthorized, "invalid admin token")
 			return
