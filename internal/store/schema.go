@@ -43,6 +43,14 @@ func (db *DB) Migrate() error {
 			created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 		)`,
 		`CREATE INDEX IF NOT EXISTS idx_install_dry_runs_created ON install_dry_runs(created_at,id)`,
+		`CREATE TABLE IF NOT EXISTS admin_audit (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			method TEXT NOT NULL CHECK(method IN ('POST','PATCH','PUT','DELETE')),
+			path TEXT NOT NULL,
+			status_code INTEGER NOT NULL,
+			created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+		)`,
+		`CREATE INDEX IF NOT EXISTS idx_admin_audit_created ON admin_audit(created_at,id)`,
 	} {
 		if err := db.Exec(sql); err != nil {
 			return fmt.Errorf("migration: %w", err)
