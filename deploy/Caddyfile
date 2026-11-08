@@ -1,9 +1,18 @@
 {$DOMAIN} {
     encode zstd gzip
     request_body {
-        max_size 105MB
+        max_size 120MB
     }
-    reverse_proxy app:8080
+    # The browser uses HTTP Basic for the site gate and X-Vacuumhub-Token
+    # for the separate application-level authorization.
+    @admin path /admin.html /api/v1/admin/*
+    basic_auth @admin {
+        {$ADMIN_BASIC_USER} {$ADMIN_BASIC_HASH}
+    }
+    reverse_proxy app:8080 {
+        # Override incoming header; the Go app trusts this only behind Caddy.
+        header_up X-Real-IP {remote_host}
+    }
     header {
         Strict-Transport-Security "max-age=31536000; includeSubDomains"
         X-Content-Type-Options "nosniff"
