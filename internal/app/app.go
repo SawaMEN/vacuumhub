@@ -68,6 +68,7 @@ func (a *App) Handler() http.Handler {
 	mux.HandleFunc("POST /api/v1/admin/models", a.admin(a.createModel))
 	mux.HandleFunc("POST /api/v1/admin/assets", a.admin(a.upload))
 	mux.HandleFunc("GET /api/v1/admin/assets", a.admin(a.adminAssets))
+	mux.HandleFunc("GET /api/v1/admin/audit", a.admin(a.adminAudit))
 	mux.HandleFunc("PATCH /api/v1/admin/assets/{id}", a.admin(a.review))
 	mux.Handle("GET /", http.FileServer(http.Dir(a.WebDir)))
 	return headers(mux)
