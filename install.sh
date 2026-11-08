@@ -308,7 +308,13 @@ install_native(){
   [[ "$ACCESS_MODE" == ip || "$ACCESS_MODE" == domain ]] || die 'Устаревший режим доступа; выберите настройку.'
  else
   config_access || return 0
-  config_credentials
+  if [[ "$action" == configure && -f "$ENV_FILE" ]];then
+   ADMIN_BASIC_USER="$(get_config ADMIN_BASIC_USER)"
+   PASSWORD_B64="$(get_config ADMIN_BASIC_PASSWORD_B64)"
+   [[ -n "$ADMIN_BASIC_USER" && -n "$PASSWORD_B64" ]] || die 'Учётные данные не настроены; используйте смену логина/пароля.'
+  else
+   config_credentials
+  fi
  fi
  backup_old
  # For routine upgrades, preserve certificates and access choices.
