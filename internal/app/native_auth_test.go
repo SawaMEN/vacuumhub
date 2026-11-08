@@ -44,7 +44,7 @@ func TestNativeBasicProtectsPageAndAPI(t *testing.T){
  if req.Code!=201{t.Fatalf("native admin write failed %d %s",req.Code,req.Body.String())}
  req=makeRequest("GET","/api/v1/auth-mode","",false,false,"")
  if req.Code!=200||!bytes.Contains(req.Body.Bytes(),[]byte("basic")){t.Fatal(req.Body.String())}
- req=makeRequest("GET","/index.html","",false,false,"")
+ req=makeRequest("GET","/","",false,false,"")
  if req.Code!=200||!bytes.Contains(req.Body.Bytes(),[]byte("VacuumHub")){t.Fatal("embedded frontend unavailable")}
  req=makeRequest("GET","/admin.html","",true,false,"")
  if req.Header().Get("Cache-Control")!="no-store"{t.Fatal("admin HTML cacheable")}
