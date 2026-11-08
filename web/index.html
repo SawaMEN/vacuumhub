@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>VacuumHub — каталог роботов, озвучки и прошивки</title>
+  <meta name="description" content="Каталог роботов-пылесосов, голосовых пакетов и прошивок с проверкой контрольных сумм.">
+  <link rel="stylesheet" href="/style.css"><script defer src="/app.js"></script>
+</head>
+<body>
+  <header class="header"><div class="container bar"><a href="/" class="logo" aria-label="VacuumHub главная"><span class="logo-mark">V</span><span>Vacuum<span class="logo-accent">Hub</span></span></a><nav><a class="active" href="/">Каталог</a><a href="/admin.html">Управление</a></nav></div></header>
+  <main>
+    <section class="hero container"><div class="eyebrow"><span class="pulse"></span> Открытая платформа для вашего робота</div><h1>Ваш робот.<br><span class="gradient-text">Ваши настройки.</span></h1><p class="lede">Исследуйте модели роботов-пылесосов, находите совместимые озвучки и проверенные архивы прошивок в одном месте.</p><div class="hero-features"><span>◉ Каталог моделей</span><span>◉ Голосовые пакеты</span><span>◉ Архив версий</span></div></section>
+    <section class="container workarea">
+      <div class="section-head"><div><p class="label">БИБЛИОТЕКА</p><h2>Найти нужное</h2></div><p class="subtitle">Только опубликованные и проверенные администратором файлы</p></div>
+      <div class="tabs" role="tablist" aria-label="Категория"><button class="tab active" data-tab="models" role="tab" aria-selected="true">Модели</button><button class="tab" data-tab="voicepacks" role="tab" aria-selected="false">Озвучки</button><button class="tab" data-tab="firmware" role="tab" aria-selected="false">Прошивки</button></div>
+      <div class="filters"><label class="search-wrap"><span class="sr-only">Поиск</span><span aria-hidden="true">⌕</span><input id="query" type="search" placeholder="Название, производитель или код модели" autocomplete="off"></label><label class="model-wrap"><span class="sr-only">Модель робота</span><select id="model-filter"><option value="">Все модели</option></select></label></div>
+      <div id="status" class="status" role="status">Загрузка каталога…</div><div id="results" class="results" aria-live="polite"></div>
+    </section>
+    <section class="container safety"><div class="safety-icon">!</div><div><h3>Важно перед установкой прошивки</h3><p>Файл предназначен только для указанной модели и региона. Установка и откат версии могут быть недоступны или повредить устройство. VacuumHub пока предоставляет каталог и загрузку файлов, но не прошивает роботы автоматически.</p></div></section>
+  </main>
+  <footer class="footer container"><span>VacuumHub — независимый проект</span><span>Совместимость требует проверки на конкретном устройстве</span></footer>
+</body>
+</html>
