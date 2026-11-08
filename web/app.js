@@ -81,7 +81,13 @@ function assetCard(item) {
   if (item.region) top.append(label('Регион: ' + item.region));
   if (item.kind === 'voicepack' && item.author) top.append(label('Автор: ' + item.author));
   if (item.kind === 'voicepack' && item.license) top.append(label('Лицензия: ' + item.license));
-  if (item.kind === 'firmware') top.append(label('Совместимость не подтверждена'));
+  if (item.kind === 'firmware') {
+    top.append(label(item.firmware_compatibility === 'documented' ? 'Ревизия задокументирована, установка не проверена' : 'Совместимость не подтверждена'));
+    if(item.firmware_scan_status === 'clean') top.append(label('ClamAV: проверено при публикации'));
+    if(item.firmware_authenticity === 'trusted_key_signature') top.append(label('Подпись совпала с доверенным ключом'));
+    else top.append(label('Подлинность производителя не установлена'));
+    if(item.firmware_variant_id) top.append(label('Вариант: '+item.firmware_variant_id));
+  }
   card.append(top, node('h3', '', item.title));
   const details = item.version ? 'Версия: ' + item.version : 'Голосовой пакет';
   card.append(node('p', 'muted', details + (item.notes ? ' · ' + item.notes : '')));
@@ -112,6 +118,30 @@ function assetCard(item) {
       }catch(err){box.textContent=err.message;}
     });
     card.append(history);
+  }
+  if (item.kind === 'firmware') {
+    const info=node('p','muted','Источник: '+(item.firmware_source_name||'не указан')+' · Лицензия: '+(item.license||'не указана')+' · Откат: '+(item.firmware_downgrade_policy||'unknown'));
+    card.append(info);
+    for (const [field,labelText] of [['firmware_source_url','Первоисточник'],['firmware_evidence_url','Основание привязки к ревизии']]) {
+      if(item[field]) {
+        const link=node('a','text-button',labelText);
+        link.href=item[field];link.target='_blank';link.rel='noopener noreferrer nofollow';card.append(link);
+      }
+    }
+    const history=node('button','text-button','История прошивок этой ревизии');
+    history.addEventListener('click',async()=>{
+      const old=card.querySelector('.voice-history');if(old){old.remove();return;}
+      const area=node('div','voice-history','Загрузка…');card.append(area);
+      try{
+        const list=await request('/api/v1/firmware/'+encodeURIComponent(item.id)+'/versions');
+        area.replaceChildren(node('strong','','Опубликованные версии:'));
+        for(const fw of list){
+          const line=node('p','muted','Версия '+fw.version+' · '+fw.channel+' · '+fw.region+' · ');
+          const a=node('a','','Скачать');a.href='/api/v1/assets/'+encodeURIComponent(fw.id)+'/download';a.rel='nofollow';
+          line.append(a);area.append(line);
+        }
+      }catch(error){area.textContent=error.message;}
+    });card.append(history);
   }
   const footer = node('div', 'card-bottom');
   footer.append(node('span', 'mono', (item.size_bytes / (1024 * 1024)).toFixed(1) + ' МБ · SHA-256: ' + item.sha256.slice(0, 12) + '…'));
