@@ -10,21 +10,22 @@ install -d -m 0700 "$OUT"
 OUT="$(cd -- "$OUT" && pwd)"
 ACTIVE=0
 systemctl is-active --quiet "$SERVICE" && ACTIVE=1 || true
-restore_service(){
+cleanup(){
  local rc=$?
  trap - EXIT
+ [[ -z "${tmp:-}" ]] || rm -f -- "$tmp"
  if [[ "$ACTIVE" == 1 ]]; then
   if ! systemctl start "$SERVICE"; then echo 'CRITICAL: service restart failed' >&2; rc=1; fi
  fi
  exit "$rc"
 }
-trap restore_service EXIT
+trap cleanup EXIT
 trap 'exit 130' INT TERM HUP
 if [[ "$ACTIVE" == 1 ]]; then systemctl stop "$SERVICE";fi
 [[ -s "$DATA_DIR/vacuumhub.sqlite" ]] || { echo 'Database missing after stop.' >&2; exit 1; }
-name="vacuumhub-$(date -u +%Y%m%dT%H%M%SZ)-$@.tar.gz"
+name="vacuumhub-$(date -u +%Y%m%dT%H%M%SZ)-$.tar.gz"
 tmp="$OUT/$name.part"
-trap 'rm -f "$tmp"; restore_service' EXIT
+
 tar -C "$DATA_DIR" -czf "$tmp" .
 tar -tzf "$tmp" >/dev/null
 mv -f -- "$tmp" "$OUT/$name"
