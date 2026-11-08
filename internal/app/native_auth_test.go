@@ -3,9 +3,7 @@ package app
 import (
  "bytes"
  "encoding/base64"
- "net/http"
  "net/http/httptest"
- "os"
  "path/filepath"
  "strings"
  "testing"
@@ -73,5 +71,4 @@ func TestNativeFileServerDoesNotNeedExternalAssets(t *testing.T){
  r:=httptest.NewRecorder()
  a.Handler().ServeHTTP(r,httptest.NewRequest("GET","https://example.org/style.css",nil))
  if r.Code!=200||!strings.Contains(r.Body.String(),"container"){t.Fatalf("asset not embedded: %d",r.Code)}
- _=os.Getenv("HOME")
 }
