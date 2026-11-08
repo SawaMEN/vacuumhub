@@ -50,7 +50,7 @@ type Input struct {
 
 type Check struct {
 	ID     string `json:"id"`
-	Status string `json:"status"` // pass, fail or unverified
+	Status string `json:"status"` // pass, fail, reported_match or unverified
 	Detail string `json:"detail"`
 }
 
@@ -79,26 +79,33 @@ func Evaluate(in Input) Report {
 		}
 		out.Checks = append(out.Checks, Check{ID: id, Status: status, Detail: detail})
 	}
+	claimed := func(id string, matches bool, detail string) {
+		status := "fail"
+		if matches {
+			status = "reported_match"
+		}
+		out.Checks = append(out.Checks, Check{ID: id, Status: status, Detail: detail})
+	}
 	add("firmware_published", in.FirmwareApproved, "Прошивка должна быть опубликована после модерации")
 	add("malware_scan", in.ScannedClean, "Для публикации обязательна проверка ClamAV")
 	add("revision_mapping", in.RevisionDocumented && in.SourcePresent,
 		"Требуются документированная ревизия и подтверждаемый источник")
 	add("file_integrity", in.FirmwareHashOK, "SHA-256 локального файла должен соответствовать каталогу")
-	add("model", in.VariantModel != "" && in.Device.ModelSlug == in.VariantModel,
+	claimed("model", in.VariantModel != "" && in.Device.ModelSlug == in.VariantModel,
 		"Модель устройства должна точно совпадать с записью прошивки")
-	add("variant", in.VariantID != "" && in.Device.VariantID == in.VariantID,
+	claimed("variant", in.VariantID != "" && in.Device.VariantID == in.VariantID,
 		"Аппаратный вариант должен точно совпадать")
-	add("region", in.VariantRegion != "" && in.Device.Region == in.VariantRegion,
+	claimed("region", in.VariantRegion != "" && in.Device.Region == in.VariantRegion,
 		"Регион должен совпадать без автоматического преобразования")
-	add("revision", in.VariantRevision != "" && in.Device.HardwareRevision == in.VariantRevision,
+	claimed("revision", in.VariantRevision != "" && in.Device.HardwareRevision == in.VariantRevision,
 		"Требуется точная аппаратная ревизия")
-	add("hardware_id", in.VerifiedHardwareID && in.Device.HardwareID != "",
+	claimed("hardware_id", in.VerifiedHardwareID && in.Device.HardwareID != "",
 		"Аппаратный ID должен совпадать с проверенной записью каталога")
-	add("power", in.Device.BatteryPercent >= 70 && in.Device.BatteryPercent <= 100 && in.Device.Charging,
+	claimed("power", in.Device.BatteryPercent >= 70 && in.Device.BatteryPercent <= 100 && in.Device.Charging,
 		"Консервативная проверка: заряд не менее 70% и питание подключено")
-	add("current_version", in.Device.InstalledVersion != "" && in.Device.InstalledVersion != in.TargetVersion,
+	claimed("current_version", in.Device.InstalledVersion != "" && in.Device.InstalledVersion != in.TargetVersion,
 		"Нужно определить текущую версию; повторная запись той же версии не разрешена")
-	add("bootloader", in.Device.Bootloader == "verified_supported",
+	claimed("bootloader", in.Device.Bootloader == "verified_supported",
 		"Требуется подтверждение поддерживаемого загрузчика")
 	add("downgrade", in.DowngradePolicy != "unknown" && in.DowngradePolicy != "",
 		"Ограничения отката должны быть исследованы; автоматическое сравнение версий отсутствует")
