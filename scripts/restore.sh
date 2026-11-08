@@ -31,8 +31,8 @@ NAME=$(basename -- "$ARCHIVE")
 compose stop -t 120 app
 echo 'Restoring live volume. If interrupted, the app remains stopped.' >&2
 docker run --rm -v "$VOLUME:/target" -v "$DIR:/backup:ro" alpine:3.21 \
-    sh -ec 'cd /target; find . -mindepth 1 -maxdepth 1 -exec rm -rf {} \;; tar xzf "/backup/$1"; test -s vacuumhub.sqlite' sh "$NAME"
-docker run --rm --user 0 -v "$VOLUME:/data" -e DATA_DIR=/data \
+    sh -ec 'cd /target; find . -mindepth 1 -maxdepth 1 -exec rm -rf {} \;; tar xzf "/backup/$1"; test -s vacuumhub.sqlite; chown -R 10001:10001 /target' sh "$NAME"
+docker run --rm --user 10001:10001 -v "$VOLUME:/data" -e DATA_DIR=/data \
     --entrypoint /usr/local/bin/vacuumhub "$IMAGE" --verify-data
 compose start app
 echo "Restore complete. Verify HTTPS, catalog and admin access before serving traffic."
