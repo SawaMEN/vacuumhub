@@ -6,3 +6,4 @@ data
 *.zip
 *.tar.gz
 .DS_Store
+backups/
