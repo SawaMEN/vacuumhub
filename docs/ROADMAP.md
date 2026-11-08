@@ -100,6 +100,8 @@
 
 См. [INSTALL.md](INSTALL.md): контракт адаптера, API, журнал и требования для допуска к физическому устройству.
 
+**Проверка программной части:** [GitHub Actions, PR #8](https://github.com/SawaMEN/vacuumhub/actions/runs/42517653413) — Go-тесты с race detector, `go vet`, Docker build и JavaScript syntax успешно пройдены. Физическое тестирование не проводилось.
+
 ## Этап 6 — production
 
 - [ ] Защита административного доступа: роли, аудит и ограничения запросов.
