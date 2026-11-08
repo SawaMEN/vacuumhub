@@ -3,7 +3,6 @@ package app
 import (
 	"crypto/rand"
 	"crypto/sha256"
-	"crypto/subtle"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
@@ -29,6 +28,8 @@ var idRE = regexp.MustCompile(`^[a-f0-9]{32}$`)
 
 type App struct {
 	DB                             *store.DB
+	TrustProxyHeaders              bool
+	failures                       authAttempts
 	firmwareMu                     sync.Mutex
 	StorageDir, AdminToken, WebDir string
 }
@@ -40,12 +41,13 @@ func New(db *store.DB, storageDir, adminToken, webDir string) (*App, error) {
 	if err := os.MkdirAll(storageDir, 0700); err != nil {
 		return nil, err
 	}
-	return &App{DB: db, StorageDir: storageDir, AdminToken: adminToken, WebDir: webDir}, nil
+	return &App{DB: db, StorageDir: storageDir, AdminToken: adminToken, WebDir: webDir, TrustProxyHeaders: readProxyConfig()}, nil
 }
 
 func (a *App) Handler() http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /api/v1/health", func(w http.ResponseWriter, r *http.Request) { reply(w, http.StatusOK, map[string]any{"status": "ok"}) })
+	mux.HandleFunc("GET /api/v1/ready", a.readiness)
 	mux.HandleFunc("GET /api/v1/manufacturers", a.manufacturers)
 	mux.HandleFunc("GET /api/v1/models", a.catalogModels)
 	mux.HandleFunc("GET /api/v1/models/{slug}/variants", a.variants)
@@ -76,6 +78,10 @@ func headers(next http.Handler) http.Handler {
 		w.Header().Set("X-Content-Type-Options", "nosniff")
 		w.Header().Set("Referrer-Policy", "no-referrer")
 		w.Header().Set("X-Frame-Options", "DENY")
+		w.Header().Set("Permissions-Policy", "camera=(), microphone=(), geolocation=()")
+		if r.URL.Path == "/admin.html" || strings.HasPrefix(r.URL.Path, "/api/v1/admin/") {
+			w.Header().Set("Cache-Control", "no-store")
+		}
 		w.Header().Set("Content-Security-Policy", "default-src 'self'; object-src 'none'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'")
 		next.ServeHTTP(w, r)
 	})
@@ -90,17 +96,6 @@ func reply(w http.ResponseWriter, status int, body any) {
 func problem(w http.ResponseWriter, status int, msg string) {
 	reply(w, status, map[string]string{"error": msg})
 }
-func (a *App) admin(next http.HandlerFunc) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		v := strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer ")
-		if len(v) != len(a.AdminToken) || subtle.ConstantTimeCompare([]byte(v), []byte(a.AdminToken)) != 1 {
-			problem(w, 401, "invalid admin token")
-			return
-		}
-		next(w, r)
-	}
-}
-
 func clean(s string, max int) string {
 	s = strings.TrimSpace(s)
 	if len(s) > max {
