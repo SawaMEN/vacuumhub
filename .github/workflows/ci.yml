@@ -22,8 +22,25 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
-      - name: Docker build
-        run: docker build -f deploy/Dockerfile .
+      - name: Build and test stopped-volume backup / isolated restore
+        run: |
+          cp .env.example .env
+          chmod 600 .env
+          docker compose --env-file .env -f deploy/compose.yaml up -d --build app
+          trap 'docker compose --env-file .env -f deploy/compose.yaml logs --tail=60 app || true; docker compose --env-file .env -f deploy/compose.yaml down -v || true' EXIT
+          READY=0
+          for i in $(seq 1 30); do
+            if docker compose --env-file .env -f deploy/compose.yaml exec -T app /usr/local/bin/vacuumhub --healthcheck; then
+              READY=1
+              break
+            fi
+            sleep 1
+          done
+          test "$READY" = 1
+          sh scripts/backup.sh
+          ARCHIVE=$(find backups -maxdepth 1 -type f -name '*.tar.gz' -print -quit)
+          test -n "$ARCHIVE"
+          sh scripts/restore-drill.sh "$ARCHIVE"
 
   js-check:
     runs-on: ubuntu-24.04
