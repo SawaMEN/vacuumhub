@@ -176,12 +176,12 @@ func TestFirmwarePinnedSignature(t *testing.T) {
 func TestFirmwareLegacyApprovedHidden(t *testing.T) {
 	a, h := testApp(t)
 	if err := a.DB.Exec(`INSERT INTO assets(id,kind,model_slug,title,version,region,original_filename,storage_filename,size_bytes,sha256,status)
-		VALUES('old-firmware','firmware','roborock-s5','Old','1.0','global','old.bin','old.blob',10,'00','approved')`); err != nil { t.Fatal(err) }
+		VALUES('00000000000000000000000000000001','firmware','roborock-s5','Old','1.0','global','old.bin','old.blob',10,'00','approved')`); err != nil { t.Fatal(err) }
 	if err := os.WriteFile(filepath.Join(a.StorageDir, "old.blob"), []byte("old fw"), 0600); err != nil { t.Fatal(err) }
 	r := httpReq(t, h, "GET", "/api/v1/firmware", nil, false, "")
 	if bytes.Contains(r.Body.Bytes(), []byte("Old")) { t.Fatal("legacy unscanned firmware shown") }
-	r = httpReq(t, h, "GET", "/api/v1/assets/old-firmware/download", nil, false, "")
-	if r.Code != 400 && r.Code != 404 { t.Fatal("legacy unscanned firmware downloadable", r.Code) }
+	r = httpReq(t, h, "GET", "/api/v1/assets/00000000000000000000000000000001/download", nil, false, "")
+	if r.Code != 404 { t.Fatal("legacy unscanned firmware downloadable", r.Code) }
 }
 
 func TestFirmwareZipInspection(t *testing.T) {
