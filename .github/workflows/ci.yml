@@ -31,3 +31,24 @@ jobs:
       - uses: actions/checkout@v4
       - name: JavaScript syntax
         run: node --check web/app.js && node --check web/admin.js
+
+  ops-check:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check maintenance script syntax
+        run: |
+          sh -n scripts/backup.sh
+          sh -n scripts/restore-drill.sh
+          sh -n scripts/restore.sh
+      - name: Validate Docker Compose configuration
+        run: |
+          DOMAIN=vacuum.example.org ADMIN_API_TOKEN=test-secret-value-over-24-chars ADMIN_BASIC_USER=test ADMIN_BASIC_HASH=test-bcrypt-placeholder \
+            docker compose --env-file .env.example -f deploy/compose.yaml config --quiet
+      - name: Validate Caddyfile with real bcrypt hash
+        run: |
+          HASH=$(docker run --rm caddy:2 caddy hash-password --plaintext test-password-for-CI)
+          docker run --rm \
+            -e DOMAIN=vacuum.example.org -e ADMIN_BASIC_USER=test -e ADMIN_BASIC_HASH="$HASH" \
+            -v "$PWD/deploy/Caddyfile:/etc/caddy/Caddyfile:ro" \
+            caddy:2 caddy adapt --config /etc/caddy/Caddyfile --adapter caddyfile >/dev/null
