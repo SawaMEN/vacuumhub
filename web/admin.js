@@ -182,3 +182,16 @@ document.getElementById('install-history-load').addEventListener('click',async()
     }
   }catch(error){notify(error.message);}
 });
+
+document.getElementById('audit-load').addEventListener('click',async()=>{
+  const list=document.getElementById('audit-list');
+  try{
+    const events=await api('admin/audit?limit=50');
+    list.replaceChildren();
+    if(!events.length)list.append(element('p','muted','Журнал пуст.'));
+    for(const event of events){
+      list.append(element('p','small muted',event.created_at+' · '+event.method+
+        ' '+event.path+' · HTTP '+event.status_code));
+    }
+  }catch(error){notify(error.message);}
+});
