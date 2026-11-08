@@ -14,7 +14,7 @@
 
 ## API (только администратор)
 
-Запросы требуют `Authorization: Bearer ADMIN_API_TOKEN`.
+При нативной установке запросы требуют HTTP Basic по HTTPS и заголовок `X-Vacuumhub-Request: same-origin` для POST/PATCH (см. [OPERATIONS.md](OPERATIONS.md)). Ранее используемый Bearer-токен сохраняется только в режиме без заданной пары логин/пароль.
 
 `POST /api/v1/admin/install/dry-runs` принимает, например:
 
