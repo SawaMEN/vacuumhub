@@ -41,7 +41,7 @@ if [ "$RUNNING" = true ]; then
 fi
 NAME="vacuumhub-$(date -u +%Y%m%dT%H%M%SZ)-$$.tar.gz"
 docker run --rm -v "$VOLUME:/source:ro" -v "$OUT:/backup" alpine:3.21 \
-    sh -ec 'test -s /source/vacuumhub.sqlite; cd /source; tar czf "/backup/$1" .' sh "$NAME"
+    sh -ec 'umask 077; test -s /source/vacuumhub.sqlite; cd /source; tar czf "/backup/$1" .; chown "$2:$3" "/backup/$1"' sh "$NAME" "$(id -u)" "$(id -g)"
 (
     cd "$OUT"
     sha256sum "$NAME" > "$NAME.sha256"
