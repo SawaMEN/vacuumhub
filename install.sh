@@ -297,6 +297,11 @@ install_native(){
  trap cleanup_install EXIT
  prepare_directories
  if [[ "$action" == update || "$action" == install ]];then fetch_package;fi
+ if [[ "$action" == update && -s "$STATE_DIR/vacuumhub.sqlite" && -f "$INSTALL_DIR/scripts/backup-native.sh" ]];then
+  echo 'Создаётся обязательная резервная копия перед обновлением...'
+  bash "$INSTALL_DIR/scripts/backup-native.sh" /var/backups/vacuumhub/pre-update ||
+   die 'Обновление остановлено: не удалось создать резервную копию.'
+ fi
  if [[ "$action" == update && -f "$ENV_FILE" ]];then
   ACCESS_MODE="$(get_config ACCESS_MODE)"
   PUBLIC_HOST="$(get_config PUBLIC_HOST)"
