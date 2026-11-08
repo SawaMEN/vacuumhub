@@ -8,7 +8,7 @@ const manufacturerSelect = document.getElementById('manufacturer-select');
 function notify(message, good = false) { notice.textContent = message; notice.className = 'notice ' + (good ? 'good' : 'bad'); }
 function element(tag, cls, text) { const n = document.createElement(tag); if(cls)n.className=cls; if(text!==undefined)n.textContent=text; return n; }
 async function api(path, options = {}) {
-  const headers = {Authorization:'Bearer '+token.value.trim()};
+  const headers = {'X-Vacuumhub-Token':token.value.trim()};
   if (!(options.body instanceof FormData) && options.body) headers['Content-Type'] = 'application/json';
   const r = await fetch('/api/v1/' + path, { ...options, headers });
   const payload = await r.json();
