@@ -26,6 +26,10 @@ func NativeConfigFromEnv() (NativeConfig,error) {
 		ListenHost:os.Getenv("LISTEN_HOST"), CertFile:os.Getenv("TLS_CERT_FILE"),
 		KeyFile:os.Getenv("TLS_KEY_FILE"),
 	}
+	username,_,basicErr:=loadBasicCredentials()
+	if basicErr!=nil{return c,basicErr}
+	if username==""{return c,fmt.Errorf("native HTTPS requires ADMIN_BASIC_USER and ADMIN_BASIC_PASSWORD_B64")}
+	if len(os.Getenv("ADMIN_API_TOKEN"))<24{return c,fmt.Errorf("ADMIN_API_TOKEN must have at least 24 characters")}
 	if c.ListenHost=="" {c.ListenHost="0.0.0.0"}
 	port:=os.Getenv("LISTEN_PORT")
 	if port=="" {port="8443"}
