@@ -1,7 +1,13 @@
-name: Test and build
+name: Native Linux tests and releases
 on:
   push:
+    branches: [main, "feature/**"]
   pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
 jobs:
   go-tests:
     runs-on: ubuntu-24.04
@@ -9,63 +15,98 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
         with:
-          go-version: '1.23'
-      - name: Install SQLite development files
-        run: sudo apt-get update && sudo apt-get install -y libsqlite3-dev gcc
-      - name: Test
+          go-version: "1.23"
+      - name: Install SQLite build dependencies
+        run: sudo apt-get update && sudo apt-get install -y gcc libsqlite3-dev
+      - name: Go tests with race detector
         run: CGO_ENABLED=1 go test -race ./...
       - name: Vet
         run: CGO_ENABLED=1 go vet ./...
-      - name: Build binary
-        run: CGO_ENABLED=1 go build -o /tmp/vacuumhub ./cmd/vacuumhub
-  docker-build:
+      - name: Build native server
+        run: CGO_ENABLED=1 go build -o /tmp/vacuumhub-test ./cmd/vacuumhub
+
+  installer-tests:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
-      - name: Build and test stopped-volume backup / isolated restore
+      - name: Test IP/domain-only menu and native scripts
+        run: bash tests/native-installer.sh
+      - name: Verify embedded manager and unit
         run: |
-          cp .env.example .env
-          chmod 600 .env
-          docker compose --env-file .env -f deploy/compose.yaml up -d --build app
-          trap 'docker compose --env-file .env -f deploy/compose.yaml logs --tail=60 app || true; docker compose --env-file .env -f deploy/compose.yaml down -v || true' EXIT
-          READY=0
-          for i in $(seq 1 30); do
-            if docker compose --env-file .env -f deploy/compose.yaml exec -T app /usr/local/bin/vacuumhub --healthcheck; then
-              READY=1
-              break
-            fi
-            sleep 1
-          done
-          test "$READY" = 1
-          sh scripts/backup.sh
-          ARCHIVE=$(find backups -maxdepth 1 -type f -name '*.tar.gz' -print -quit)
-          test -n "$ARCHIVE"
-          sh scripts/restore-drill.sh "$ARCHIVE"
+          grep -q 'User=vacuumhub' deploy/vacuumhub.service
+          grep -q 'EnvironmentFile=/etc/vacuumhub/environment' deploy/vacuumhub.service
+          ! grep -q 'Docker Compose' install.sh
+          ! grep -q 'Только локально' install.sh
 
-  js-check:
+  web-tests:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
       - name: JavaScript syntax
         run: node --check web/app.js && node --check web/admin.js
 
-  ops-check:
+  static-linux:
+    needs: [go-tests, installer-tests, web-tests]
     runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        arch: [amd64, arm64]
     steps:
       - uses: actions/checkout@v4
-      - name: Check maintenance script syntax
+      - uses: docker/setup-qemu-action@v3
+      - uses: docker/setup-buildx-action@v3
+      - name: Build portable static executable in CI
         run: |
-          sh -n scripts/backup.sh
-          sh -n scripts/restore-drill.sh
-          sh -n scripts/restore.sh
-      - name: Validate Docker Compose configuration
+          docker buildx build --platform linux/${{ matrix.arch }} --file build/Dockerfile.static \
+            --output type=local,dest=dist-binary .
+          test -s dist-binary/vacuumhub
+          ! readelf -l dist-binary/vacuumhub | grep -q INTERP
+      - name: Package native systemd release
         run: |
-          DOMAIN=vacuum.example.org ADMIN_API_TOKEN=test-secret-value-over-24-chars ADMIN_BASIC_USER=test ADMIN_BASIC_HASH=test-bcrypt-placeholder \
-            docker compose --env-file .env.example -f deploy/compose.yaml config --quiet
-      - name: Validate Caddyfile with real bcrypt hash
+          mkdir -p pkg/deploy pkg/scripts dist
+          install -m 0755 dist-binary/vacuumhub pkg/vacuumhub
+          install -m 0755 install.sh pkg/install.sh
+          install -m 0755 deploy/vacuumhub pkg/deploy/vacuumhub
+          cp deploy/vacuumhub.service deploy/vacuumhub-cert-renew.service deploy/vacuumhub-cert-renew.timer pkg/deploy/
+          install -m 0755 scripts/backup-native.sh pkg/scripts/backup-native.sh
+          install -m 0755 scripts/restore-drill-native.sh pkg/scripts/restore-drill-native.sh
+          install -m 0755 scripts/restore-native.sh pkg/scripts/restore-native.sh
+          tar -czf dist/vacuumhub-linux-${{ matrix.arch }}.tar.gz -C pkg \
+            vacuumhub install.sh deploy scripts
+      - uses: actions/upload-artifact@v4
+        with:
+          name: vacuumhub-linux-${{ matrix.arch }}
+          path: dist/vacuumhub-linux-${{ matrix.arch }}.tar.gz
+          if-no-files-found: error
+
+  publish:
+    needs: static-linux
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: vacuumhub-linux-*
+          merge-multiple: true
+          path: dist
+      - name: Check both architectures and hash release assets
         run: |
-          HASH=$(docker run --rm caddy:2 caddy hash-password --plaintext test-password-for-CI)
-          docker run --rm \
-            -e DOMAIN=vacuum.example.org -e ADMIN_BASIC_USER=test -e ADMIN_BASIC_HASH="$HASH" \
-            -v "$PWD/deploy/Caddyfile:/etc/caddy/Caddyfile:ro" \
-            caddy:2 caddy adapt --config /etc/caddy/Caddyfile --adapter caddyfile >/dev/null
+          test -s dist/vacuumhub-linux-amd64.tar.gz
+          test -s dist/vacuumhub-linux-arm64.tar.gz
+          (cd dist && sha256sum vacuumhub-linux-*.tar.gz > SHA256SUMS)
+      - name: Publish verified native release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TAG="v0.7.${{ github.run_number }}"
+          gh release create "$TAG" \
+            dist/vacuumhub-linux-amd64.tar.gz \
+            dist/vacuumhub-linux-arm64.tar.gz \
+            dist/SHA256SUMS \
+            --repo "$GITHUB_REPOSITORY" \
+            --title "VacuumHub $TAG — native systemd" \
+            --notes "Native HTTPS-only IP/domain installation. No Docker on the VDS; amd64/arm64 binaries with embedded web UI and SQLite." \
+            --latest
