@@ -8,6 +8,7 @@ services:
       ADMIN_API_TOKEN: ${ADMIN_API_TOKEN:?Set ADMIN_API_TOKEN in .env}
       FIRMWARE_CLAMD_ADDR: ${FIRMWARE_CLAMD_ADDR:-}
       FIRMWARE_TRUSTED_KEYS: ${FIRMWARE_TRUSTED_KEYS:-}
+      TRUST_PROXY_HEADERS: 'true'
     volumes:
       - vacuumhub_data:/data
     networks:
@@ -26,6 +27,8 @@ services:
     restart: unless-stopped
     environment:
       DOMAIN: ${DOMAIN:?Set DOMAIN in .env}
+      ADMIN_BASIC_USER: ${ADMIN_BASIC_USER:?Set ADMIN_BASIC_USER in .env}
+      ADMIN_BASIC_HASH: ${ADMIN_BASIC_HASH:?Set ADMIN_BASIC_HASH in .env}
     ports:
       - "80:80"
       - "443:443"
@@ -37,7 +40,8 @@ services:
     networks:
       - internal
     depends_on:
-      - app
+      app:
+        condition: service_healthy
 volumes:
   vacuumhub_data:
   caddy_data:
