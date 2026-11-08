@@ -44,6 +44,7 @@ CGO_ENABLED=1 go run ./cmd/vacuumhub
 ## Документы
 
 - [Карта разработки и прогресс](docs/ROADMAP.md)
+- [Архив прошивок: происхождение, проверка, ClamAV, подлинность](docs/FIRMWARE.md)
 - [Каталог устройств: схема, API и импорт](docs/CATALOG.md)
 - [Библиотека озвучек: API, форматы и безопасность](docs/VOICEPACKS.md)
 - [Архитектура](docs/ARCHITECTURE.md)
