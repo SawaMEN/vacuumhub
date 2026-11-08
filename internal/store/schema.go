@@ -26,6 +26,10 @@ func (db *DB) Migrate() error {
 		`CREATE INDEX IF NOT EXISTS idx_variants_model_region ON model_variants(model_slug,region,hardware_revision)`,
 		`CREATE INDEX IF NOT EXISTS idx_identifiers_lookup ON variant_identifiers(kind,value)`,
 		`CREATE UNIQUE INDEX IF NOT EXISTS idx_verified_hardware_id ON variant_identifiers(value COLLATE NOCASE) WHERE kind='hardware_id' AND verification='verified'`,
+		`CREATE TRIGGER IF NOT EXISTS invalidate_variant_identifiers_on_revision_change
+         AFTER UPDATE OF region,hardware_revision ON model_variants
+         WHEN OLD.region<>NEW.region OR OLD.hardware_revision<>NEW.hardware_revision
+         BEGIN UPDATE variant_identifiers SET verification='unverified' WHERE variant_id=NEW.id; END`,
 		`CREATE INDEX IF NOT EXISTS idx_assets_discovery ON assets(kind,status,model_slug,created_at)`,
 	} {
 		if err := db.Exec(sql); err != nil {

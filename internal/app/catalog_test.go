@@ -122,3 +122,38 @@ func TestCatalogRejectsUnfoundedVerification(t *testing.T) {
 		t.Fatalf("add manufacturer: %d %s", r.Code, r.Body.String())
 	}
 }
+
+func TestChangingRevisionInvalidatesVerification(t *testing.T) {
+	a, h := testApp(t)
+	payload := `{"variants":[{"id":"test-revision-invalidation","model_slug":"roborock-s5","region":"global","hardware_revision":"rev1","identifiers":[{"kind":"hardware_id","value":"verified-hw","verification":"verified","source_url":"https://example.org/verified"}]}]}`
+	if code := importRequest(t, h, payload, true); code != 200 {
+		t.Fatalf("first import: %d", code)
+	}
+	if err := a.DB.Exec(`UPDATE model_variants SET hardware_revision=? WHERE id=?`, "rev2", "test-revision-invalidation"); err != nil {
+		t.Fatal(err)
+	}
+	r := httpReq(t, h, "GET", "/api/v1/models?verified=1", nil, false, "")
+	if r.Code != 200 || len(decodeArray(t, r.Body.Bytes())) != 0 {
+		t.Fatalf("stale revision remained verified: %d %s", r.Code, r.Body.String())
+	}
+	r = httpReq(t, h, "GET", "/api/v1/models/roborock-s5/variants", nil, false, "")
+	variants := decodeArray(t, r.Body.Bytes())
+	if variants[0]["identifiers"].([]any)[0].(map[string]any)["verification"] != "unverified" {
+		t.Fatal("identifier verification not invalidated")
+	}
+}
+func TestVerifiedHardwareIDCannotBelongToTwoVariants(t *testing.T) {
+	_, h := testApp(t)
+	first := `{"variants":[{"id":"first-verified-hw","model_slug":"roborock-s5","region":"global","hardware_revision":"r1","identifiers":[{"kind":"hardware_id","value":"SAME-DEVICE-ID","verification":"verified","source_url":"https://example.org/s1"}]}]}`
+	if code := importRequest(t, h, first, true); code != 200 {
+		t.Fatalf("first %d", code)
+	}
+	second := `{"variants":[{"id":"other-verified-hw","model_slug":"xiaomi-mi-robot","region":"global","hardware_revision":"r9","identifiers":[{"kind":"hardware_id","value":"same-device-id","verification":"verified","source_url":"https://example.org/s2"}]}]}`
+	if code := importRequest(t, h, second, true); code != 409 {
+		t.Fatalf("duplicate verified hardware ID: %d", code)
+	}
+	r := httpReq(t, h, "GET", "/api/v1/models/xiaomi-mi-robot/variants", nil, false, "")
+	if len(decodeArray(t, r.Body.Bytes())) != 0 {
+		t.Fatal("partial import after duplicate hardware ID")
+	}
+}
