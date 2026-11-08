@@ -1,5 +1,6 @@
 'use strict';
 const token = document.getElementById('token');
+let nativeBasicMode=false;
 const notice = document.getElementById('notice');
 const pending = document.getElementById('pending');
 const modelSelect = document.getElementById('upload-model');
@@ -8,7 +9,9 @@ const manufacturerSelect = document.getElementById('manufacturer-select');
 function notify(message, good = false) { notice.textContent = message; notice.className = 'notice ' + (good ? 'good' : 'bad'); }
 function element(tag, cls, text) { const n = document.createElement(tag); if(cls)n.className=cls; if(text!==undefined)n.textContent=text; return n; }
 async function api(path, options = {}) {
-  const headers = {'X-Vacuumhub-Token':token.value.trim()};
+  const headers = {};
+  if (!nativeBasicMode && token.value.trim()) headers['X-Vacuumhub-Token'] = token.value.trim();
+  if (nativeBasicMode && options.method && options.method.toUpperCase() !== 'GET') headers['X-Vacuumhub-Request'] = 'same-origin';
   if (!(options.body instanceof FormData) && options.body) headers['Content-Type'] = 'application/json';
   const r = await fetch('/api/v1/' + path, { ...options, headers });
   const payload = await r.json();
@@ -16,7 +19,7 @@ async function api(path, options = {}) {
   return payload;
 }
 async function refresh() {
-  if (!token.value.trim()) throw new Error('Введите ключ администратора');
+  if (!nativeBasicMode && !token.value.trim()) throw new Error('Введите ключ администратора');
   const [models, assets, manufacturers] = await Promise.all([
     fetch('/api/v1/models').then((r) => r.json()),
     api('admin/assets?status=pending'),
@@ -195,3 +198,16 @@ document.getElementById('audit-load').addEventListener('click',async()=>{
     }
   }catch(error){notify(error.message);}
 });
+
+async function initializeNativeAuth() {
+  try {
+    const result=await fetch('/api/v1/auth-mode',{cache:'no-store'}).then(r=>r.json());
+    if (result.mode==='basic') {
+      nativeBasicMode=true;
+      document.getElementById('token-panel').hidden=true;
+      await refresh();
+      notify('Вы вошли по логину и паролю.',true);
+    }
+  } catch(error) {notify(error.message);}
+}
+initializeNativeAuth();
