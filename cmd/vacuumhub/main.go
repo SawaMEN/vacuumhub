@@ -2,6 +2,9 @@ package main
 
 import (
 	"log/slog"
+	"fmt"
+	"net/http"
+	"time"
 	"os"
 	"path/filepath"
 
@@ -16,6 +19,16 @@ func env(name, def string) string {
 	return def
 }
 func main() {
+	// A fast, read-only probe used only by the container HEALTHCHECK.
+	if len(os.Args) == 2 && os.Args[1] == "--healthcheck" {
+		client := &http.Client{Timeout: 3 * time.Second}
+		url := fmt.Sprintf("http://127.0.0.1%s/api/v1/ready", env("LISTEN_ADDR", ":8080"))
+		resp, err := client.Get(url)
+		if err != nil { os.Exit(1) }
+		defer resp.Body.Close()
+		if resp.StatusCode != http.StatusOK { os.Exit(1) }
+		return
+	}
 	dataDir := env("DATA_DIR", "./data")
 	if err := os.MkdirAll(dataDir, 0700); err != nil {
 		slog.Error("data dir", "error", err)
