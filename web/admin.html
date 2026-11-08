@@ -22,5 +22,25 @@
 <p class="small muted">«Проверено по источнику» означает проверку идентификатора человеком, а не подтверждение безопасности прошивки. Для hardware ID также обязательны регион и ревизия.</p>
 <button class="primary" type="submit">Сохранить вариант</button></form></section>
 <section class="panel"><h2>Загрузить материал</h2><form id="asset-form" enctype="multipart/form-data"><label>Тип<select name="kind"><option value="voicepack">Озвучка</option><option value="firmware">Прошивка</option></select></label><label>Модель<select id="upload-model" name="model_slug" required></select></label><label>Название<input name="title" required placeholder="Озвучка: Русский голос"></label><label>Версия (обязательно для прошивок)<input name="version" placeholder="4.3.3"></label><label>Язык (обязательно для озвучек)<input name="language" placeholder="ru"></label><div id="voicepack-fields"><label>Серия озвучки (slug)<input name="series_slug" pattern="[a-z0-9][a-z0-9-]{1,99}" maxlength="100" placeholder="my-russian-voice"></label><label>Автор озвучки<input name="author" maxlength="120" placeholder="Имя автора"></label><label>Лицензия / права на распространение<input name="license" maxlength="120" placeholder="CC-BY-4.0"></label><label>Аудиодемо (необязательно, до 8 МБ)<input name="preview" type="file" accept=".mp3,.ogg,.wav,audio/mpeg,audio/ogg,audio/wav"></label><p class="small muted">Серия объединяет разные версии одной озвучки для одной модели и языка. Поддерживаются ZIP и TAR.GZ; пакеты .pkg требуют отдельного валидатора.</p></div><label>Регион (обязательно для прошивок)<input name="region" placeholder="global / cn"></label><label>Канал<input name="channel" placeholder="stable / beta / community"></label><label>Примечания<textarea name="notes" rows="3" placeholder="Совместимость, источник и предупреждения"></textarea></label><label>Файл, до 100 МБ<input name="file" type="file" required accept=".zip,.tar.gz,.tgz,.pkg,.bin,.img"></label><button class="primary" type="submit">Загрузить на модерацию</button></form></section>
+<section class="panel"><h2>Предварительная проверка установки</h2>
+<p class="small muted">Только dry-run. Сервис не подключается к роботу и не прошивает устройство. Все сведения о роботе вводятся вручную, поэтому не считаются проверенной телеметрией.</p>
+<form id="install-dryrun-form">
+<label>ID опубликованной прошивки (32 hex)<input name="firmware_id" required minlength="32" maxlength="32" pattern="[a-f0-9]{32}"></label>
+<label>ID аппаратного варианта<input name="variant_id" required pattern="[a-z0-9][a-z0-9-]{1,99}"></label>
+<label>Slug модели на роботе<input name="model_slug" required maxlength="100"></label>
+<label>ID варианта на роботе<input name="device_variant_id" required maxlength="100"></label>
+<label>Аппаратный ID (не сохраняется в журнале)<input name="hardware_id" required maxlength="200" autocomplete="off"></label>
+<label>Регион робота<input name="region" required maxlength="40"></label>
+<label>Аппаратная ревизия робота<input name="hardware_revision" required maxlength="120"></label>
+<label>Текущая версия ПО<input name="installed_version" required maxlength="80"></label>
+<label>Заряд, %<input name="battery_percent" type="number" min="0" max="100" value="80" required></label>
+<label><input name="charging" type="checkbox"> Робот подключён к питанию (по заявлению оператора)</label>
+<label>Загрузчик<select name="bootloader"><option value="unknown">Неизвестен</option><option value="verified_supported">Заявлен как поддерживаемый (без проверки)</option></select></label>
+<button class="primary" type="submit">Dry-run: проверить, без записи</button>
+</form>
+<div id="install-dryrun-result" class="moderation" aria-live="polite"></div>
+<button id="install-history-load" class="secondary" type="button">Последние проверки</button>
+<div id="install-history" class="moderation"></div>
+</section>
 <section class="panel"><h2>Модерация</h2><p class="muted small">Перед публикацией прошивок сохраните сведения об источнике, лицензии и точной аппаратной ревизии. Антивирус ClamAV обязателен; одобрение не означает, что прошивку безопасно устанавливать. Подпись без доверенного ключа не подтверждает подлинность.</p><div id="pending" class="moderation"></div></section></div><p id="notice" role="status" class="notice"></p></main>
 <footer class="footer container"><span>VacuumHub · Управление</span><span>Без автоматической прошивки устройства</span></footer></body></html>

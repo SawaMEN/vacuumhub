@@ -33,6 +33,16 @@ func (db *DB) Migrate() error {
 		`CREATE INDEX IF NOT EXISTS idx_assets_discovery ON assets(kind,status,model_slug,created_at)`,
 		`CREATE TABLE IF NOT EXISTS firmware_events (id INTEGER PRIMARY KEY AUTOINCREMENT,asset_id TEXT NOT NULL REFERENCES assets(id) ON DELETE RESTRICT,event TEXT NOT NULL,detail TEXT NOT NULL DEFAULT '',created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)`,
 		`CREATE INDEX IF NOT EXISTS idx_firmware_events_asset ON firmware_events(asset_id,id)`,
+		`CREATE TABLE IF NOT EXISTS install_dry_runs (
+			id TEXT PRIMARY KEY CHECK(length(id)=32),
+			firmware_id TEXT NOT NULL REFERENCES assets(id) ON DELETE RESTRICT,
+			variant_id TEXT NOT NULL REFERENCES model_variants(id) ON DELETE RESTRICT,
+			mode TEXT NOT NULL CHECK(mode='dry_run'),
+			decision TEXT NOT NULL CHECK(decision='blocked'),
+			report_json TEXT NOT NULL,
+			created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+		)`,
+		`CREATE INDEX IF NOT EXISTS idx_install_dry_runs_created ON install_dry_runs(created_at,id)`,
 	} {
 		if err := db.Exec(sql); err != nil {
 			return fmt.Errorf("migration: %w", err)

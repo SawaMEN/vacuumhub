@@ -133,3 +133,52 @@ function changeKind(){
   document.querySelector('#asset-form [name="file"]').accept=voice?'.zip,.tar.gz,.tgz':'.zip,.pkg,.tar.gz,.tgz,.bin,.img';
 }
 kindSelect.addEventListener('change',changeKind);changeKind();
+
+
+const dryRunForm=document.getElementById('install-dryrun-form');
+const dryRunResult=document.getElementById('install-dryrun-result');
+const dryRunHistory=document.getElementById('install-history');
+function renderDryRun(report){
+  dryRunResult.replaceChildren();
+  const title=element('strong','','Результат: '+report.decision+' (установка недоступна)');
+  dryRunResult.append(title,element('p','small muted',report.notice));
+  for(const check of report.checks){
+    const line=element('p','small muted',(check.status==='pass'?'Проверено сервером':check.status==='reported_match'?'Совпадает только по введённым данным':'Требует проверки')+' · '+check.id+': '+check.detail);
+    dryRunResult.append(line);
+  }
+}
+dryRunForm.addEventListener('submit',async(event)=>{
+  event.preventDefault();
+  const submit=dryRunForm.querySelector('[type=submit]');submit.disabled=true;
+  try{
+    const f=Object.fromEntries(new FormData(dryRunForm));
+    const request={
+      firmware_id:f.firmware_id,
+      variant_id:f.variant_id,
+      device:{
+        model_slug:f.model_slug,variant_id:f.device_variant_id,hardware_id:f.hardware_id,
+        region:f.region,hardware_revision:f.hardware_revision,
+        installed_version:f.installed_version,
+        battery_percent:Number(f.battery_percent),
+        charging:dryRunForm.elements.charging.checked,
+        bootloader:f.bootloader
+      }
+    };
+    const result=await api('admin/install/dry-runs',{method:'POST',body:JSON.stringify(request)});
+    dryRunForm.elements.hardware_id.value='';
+    renderDryRun(result.report);
+    notify('Dry-run сохранён в журнале. Установка прошивки отключена.',true);
+  }catch(error){dryRunForm.elements.hardware_id.value='';notify(error.message);}
+  finally{submit.disabled=false;}
+});
+document.getElementById('install-history-load').addEventListener('click',async()=>{
+  try{
+    const data=await api('admin/install/dry-runs');
+    dryRunHistory.replaceChildren();
+    if(!data.length)dryRunHistory.append(element('p','muted','Проверок пока нет.'));
+    for(const record of data){
+      dryRunHistory.append(element('p','small muted',record.created_at+
+        ' · '+record.firmware_id+' · '+record.variant_id+' · '+record.decision));
+    }
+  }catch(error){notify(error.message);}
+});
