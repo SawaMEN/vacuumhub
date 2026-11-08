@@ -1,7 +1,7 @@
 name: Native Linux tests and releases
 on:
   push:
-    branches: [main, "feature/**"]
+    branches: [main]
   pull_request:
   workflow_dispatch:
 
