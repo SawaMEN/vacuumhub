@@ -53,7 +53,10 @@ func (a *App) Handler() http.Handler {
 	mux.HandleFunc("GET /api/v1/voicepacks", a.publicAssets("voicepack"))
 	mux.HandleFunc("GET /api/v1/voicepacks/{id}/versions", a.voiceHistory)
 	mux.HandleFunc("GET /api/v1/assets/{id}/preview", a.preview)
-	mux.HandleFunc("GET /api/v1/firmware", a.publicAssets("firmware"))
+	mux.HandleFunc("GET /api/v1/firmware", a.firmwareCatalog)
+	mux.HandleFunc("GET /api/v1/firmware/{id}/details", a.firmwareDetails)
+	mux.HandleFunc("GET /api/v1/firmware/{id}/versions", a.firmwareVersions)
+	mux.HandleFunc("PATCH /api/v1/admin/firmware/{id}/metadata", a.admin(a.firmwareMetadata))
 	mux.HandleFunc("GET /api/v1/assets/{id}/download", a.download)
 	mux.HandleFunc("POST /api/v1/admin/models", a.admin(a.createModel))
 	mux.HandleFunc("POST /api/v1/admin/assets", a.admin(a.upload))
@@ -337,7 +340,7 @@ func (a *App) adminAssets(w http.ResponseWriter, r *http.Request) {
 		problem(w, 400, "invalid status")
 		return
 	}
-	rows, err := a.DB.Query(`SELECT `+assetColumns+` FROM assets WHERE (?='' OR status=?) ORDER BY created_at DESC LIMIT 200`, status, status)
+	rows, err := a.DB.Query(`SELECT `+firmwareColumns+` FROM assets WHERE (?='' OR status=?) ORDER BY created_at DESC LIMIT 200`, status, status)
 	if err != nil {
 		problem(w, 500, "database error")
 		return
@@ -403,6 +406,14 @@ func (a *App) review(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 	}
+	if rows[0]["kind"] == "firmware" {
+		if err := a.reviewFirmware(id, v.Status); err != nil {
+			problem(w, 409, err.Error())
+			return
+		}
+		reply(w, 200, map[string]string{"id": id, "status": v.Status})
+		return
+	}
 	if err := a.DB.Exec(`UPDATE assets SET status=? WHERE id=? AND status='pending'`, v.Status, id); err != nil {
 		if strings.Contains(err.Error(), "UNIQUE constraint failed") {
 			problem(w, 409, "this voicepack version is already published")
@@ -419,7 +430,7 @@ func (a *App) download(w http.ResponseWriter, r *http.Request) {
 		problem(w, 400, "invalid id")
 		return
 	}
-	rows, err := a.DB.Query(`SELECT storage_filename,original_filename FROM assets WHERE id=? AND status='approved'`, id)
+	rows, err := a.DB.Query(`SELECT storage_filename,original_filename FROM assets WHERE id=? AND status='approved' AND (kind<>'firmware' OR (firmware_scan_status='clean' AND firmware_compatibility='documented'))`, id)
 	if err != nil {
 		problem(w, 500, "database error")
 		return
