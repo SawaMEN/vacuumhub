@@ -143,7 +143,7 @@ function renderDryRun(report){
   const title=element('strong','','Результат: '+report.decision+' (установка недоступна)');
   dryRunResult.append(title,element('p','small muted',report.notice));
   for(const check of report.checks){
-    const line=element('p','small muted',(check.status==='pass'?'Проверка по введённым данным':'Требует проверки')+' · '+check.id+': '+check.detail);
+    const line=element('p','small muted',(check.status==='pass'?'Проверено сервером':check.status==='reported_match'?'Совпадает только по введённым данным':'Требует проверки')+' · '+check.id+': '+check.detail);
     dryRunResult.append(line);
   }
 }
