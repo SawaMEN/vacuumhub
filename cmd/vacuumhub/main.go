@@ -2,6 +2,9 @@ package main
 
 import (
 	"log/slog"
+	"fmt"
+	"net/http"
+	"time"
 	"os"
 	"path/filepath"
 
@@ -16,6 +19,28 @@ func env(name, def string) string {
 	return def
 }
 func main() {
+	// A fast, read-only probe used only by the container HEALTHCHECK.
+	if len(os.Args) == 2 && os.Args[1] == "--healthcheck" {
+		client := &http.Client{Timeout: 3 * time.Second}
+		url := fmt.Sprintf("http://127.0.0.1%s/api/v1/ready", env("LISTEN_ADDR", ":8080"))
+		resp, err := client.Get(url)
+		if err != nil { os.Exit(1) }
+		defer resp.Body.Close()
+		if resp.StatusCode != http.StatusOK { os.Exit(1) }
+		return
+	}
+	if len(os.Args) == 2 && os.Args[1] == "--verify-data" {
+		if err := verifyOfflineData(env("DATA_DIR", "./data")); err != nil {
+			slog.Error("offline verification failed", "error", err)
+			os.Exit(1)
+		}
+		fmt.Println("SQLite and all referenced files verified")
+		return
+	}
+	if len(os.Args) != 1 {
+		fmt.Fprintln(os.Stderr, "unknown option")
+		os.Exit(2)
+	}
 	dataDir := env("DATA_DIR", "./data")
 	if err := os.MkdirAll(dataDir, 0700); err != nil {
 		slog.Error("data dir", "error", err)
@@ -44,4 +69,17 @@ func main() {
 		slog.Error("server", "error", err)
 		os.Exit(1)
 	}
+}
+
+func verifyOfflineData(dir string) error {
+	path := filepath.Join(dir, "vacuumhub.sqlite")
+	stat, err := os.Stat(path)
+	if err != nil { return err }
+	if !stat.Mode().IsRegular() || stat.Size() == 0 {
+		return fmt.Errorf("invalid SQLite backup at %s", path)
+	}
+	db, err := store.Open(path)
+	if err != nil { return err }
+	defer db.Close()
+	return store.VerifyData(db, filepath.Join(dir, "assets"))
 }

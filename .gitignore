@@ -5,3 +5,4 @@
 *.sqlite-wal
 *.test
 .DS_Store
+backups/

@@ -8,7 +8,7 @@ const manufacturerSelect = document.getElementById('manufacturer-select');
 function notify(message, good = false) { notice.textContent = message; notice.className = 'notice ' + (good ? 'good' : 'bad'); }
 function element(tag, cls, text) { const n = document.createElement(tag); if(cls)n.className=cls; if(text!==undefined)n.textContent=text; return n; }
 async function api(path, options = {}) {
-  const headers = {Authorization:'Bearer '+token.value.trim()};
+  const headers = {'X-Vacuumhub-Token':token.value.trim()};
   if (!(options.body instanceof FormData) && options.body) headers['Content-Type'] = 'application/json';
   const r = await fetch('/api/v1/' + path, { ...options, headers });
   const payload = await r.json();
@@ -179,6 +179,19 @@ document.getElementById('install-history-load').addEventListener('click',async()
     for(const record of data){
       dryRunHistory.append(element('p','small muted',record.created_at+
         ' · '+record.firmware_id+' · '+record.variant_id+' · '+record.decision));
+    }
+  }catch(error){notify(error.message);}
+});
+
+document.getElementById('audit-load').addEventListener('click',async()=>{
+  const list=document.getElementById('audit-list');
+  try{
+    const events=await api('admin/audit?limit=50');
+    list.replaceChildren();
+    if(!events.length)list.append(element('p','muted','Журнал пуст.'));
+    for(const event of events){
+      list.append(element('p','small muted',event.created_at+' · '+event.method+
+        ' '+event.path+' · HTTP '+event.status_code));
     }
   }catch(error){notify(error.message);}
 });

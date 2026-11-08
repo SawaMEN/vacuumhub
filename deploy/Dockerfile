@@ -15,4 +15,5 @@ COPY web ./web
 USER app
 ENV DATA_DIR=/data WEB_DIR=/app/web LISTEN_ADDR=:8080
 EXPOSE 8080
+HEALTHCHECK --interval=30s --timeout=4s --start-period=20s --retries=3 CMD ["/usr/local/bin/vacuumhub", "--healthcheck"]
 ENTRYPOINT ["/usr/local/bin/vacuumhub"]
