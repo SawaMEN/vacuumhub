@@ -110,6 +110,10 @@ func (db *DB) prepareLocked(query string, args []any) (*C.sqlite3_stmt, error) {
 func (db *DB) Exec(query string, args ...any) error {
 	db.mu.Lock()
 	defer db.mu.Unlock()
+	return db.execLocked(query, args...)
+}
+
+func (db *DB) execLocked(query string, args ...any) error {
 	stmt, err := db.prepareLocked(query, args)
 	if err != nil {
 		return err

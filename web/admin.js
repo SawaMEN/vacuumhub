@@ -3,6 +3,8 @@ const token = document.getElementById('token');
 const notice = document.getElementById('notice');
 const pending = document.getElementById('pending');
 const modelSelect = document.getElementById('upload-model');
+const variantModelSelect = document.getElementById('variant-model');
+const manufacturerSelect = document.getElementById('manufacturer-select');
 function notify(message, good = false) { notice.textContent = message; notice.className = 'notice ' + (good ? 'good' : 'bad'); }
 function element(tag, cls, text) { const n = document.createElement(tag); if(cls)n.className=cls; if(text!==undefined)n.textContent=text; return n; }
 async function api(path, options = {}) {
@@ -15,12 +17,20 @@ async function api(path, options = {}) {
 }
 async function refresh() {
   if (!token.value.trim()) throw new Error('Введите ключ администратора');
-  const [models, assets] = await Promise.all([
+  const [models, assets, manufacturers] = await Promise.all([
     fetch('/api/v1/models').then((r) => r.json()),
-    api('admin/assets?status=pending')
+    api('admin/assets?status=pending'),
+    fetch('/api/v1/manufacturers').then((r) => r.json())
   ]);
-  modelSelect.replaceChildren();
-  for (const model of models) {const opt=element('option','',model.brand+' · '+model.name);opt.value=model.slug;modelSelect.append(opt);}
+  modelSelect.replaceChildren();variantModelSelect.replaceChildren();manufacturerSelect.replaceChildren();
+  for (const model of models) {
+    for (const select of [modelSelect,variantModelSelect]) {
+      const opt=element('option','',model.brand+' · '+model.name);opt.value=model.slug;select.append(opt);
+    }
+  }
+  for (const manufacturer of manufacturers) {
+    const opt=element('option','',manufacturer.name);opt.value=manufacturer.name;manufacturerSelect.append(opt);
+  }
   pending.replaceChildren();
   if (!assets.length) {pending.append(element('p','muted','Нет материалов, ожидающих модерации.'));return;}
   for (const asset of assets) {
@@ -47,4 +57,23 @@ document.getElementById('asset-form').addEventListener('submit',async(e)=>{
  e.preventDefault();const b=e.target.querySelector('[type=submit]');b.disabled=true;
  try {const data=new FormData(e.target);const item=await api('admin/assets',{method:'POST',body:data});notify('Файл загружен; SHA-256: '+item.sha256+'. Ожидает модерации.',true);e.target.reset();await refresh();}
  catch(err){notify(err.message);}finally{b.disabled=false;}
+});
+
+document.getElementById('manufacturer-form').addEventListener('submit',async(e)=>{
+  e.preventDefault();
+  try {
+    const payload=Object.fromEntries(new FormData(e.target));
+    await api('admin/manufacturers',{method:'POST',body:JSON.stringify(payload)});
+    notify('Производитель добавлен',true);e.target.reset();await refresh();
+  }catch(err){notify(err.message);}
+});
+document.getElementById('variant-form').addEventListener('submit',async(e)=>{
+  e.preventDefault();
+  try {
+    const raw=Object.fromEntries(new FormData(e.target));
+    const {identifier_kind,identifier_value,source_url,verification,...variant}=raw;
+    variant.identifiers=identifier_value.trim()?[{kind:identifier_kind,value:identifier_value.trim(),source_url:source_url.trim(),verification}]:[];
+    await api('admin/catalog/import',{method:'POST',body:JSON.stringify({variants:[variant]})});
+    notify('Ревизия и идентификатор сохранены',true);e.target.reset();await refresh();
+  }catch(err){notify(err.message);}
 });

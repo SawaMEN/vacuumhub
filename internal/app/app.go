@@ -44,7 +44,11 @@ func New(db *store.DB, storageDir, adminToken, webDir string) (*App, error) {
 func (a *App) Handler() http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /api/v1/health", func(w http.ResponseWriter, r *http.Request) { reply(w, http.StatusOK, map[string]any{"status": "ok"}) })
-	mux.HandleFunc("GET /api/v1/models", a.models)
+	mux.HandleFunc("GET /api/v1/manufacturers", a.manufacturers)
+	mux.HandleFunc("GET /api/v1/models", a.catalogModels)
+	mux.HandleFunc("GET /api/v1/models/{slug}/variants", a.variants)
+	mux.HandleFunc("POST /api/v1/admin/manufacturers", a.admin(a.createManufacturer))
+	mux.HandleFunc("POST /api/v1/admin/catalog/import", a.admin(a.importCatalog))
 	mux.HandleFunc("GET /api/v1/models/{slug}", a.model)
 	mux.HandleFunc("GET /api/v1/voicepacks", a.publicAssets("voicepack"))
 	mux.HandleFunc("GET /api/v1/firmware", a.publicAssets("firmware"))
@@ -158,6 +162,15 @@ func (a *App) createModel(w http.ResponseWriter, r *http.Request) {
 	v.Description = clean(v.Description, 1000)
 	if !slugRE.MatchString(v.Slug) || v.Brand == "" || v.Name == "" {
 		problem(w, 400, "invalid model fields")
+		return
+	}
+	known, err := a.DB.Query(`SELECT slug FROM manufacturers WHERE name=? COLLATE NOCASE`, v.Brand)
+	if err != nil {
+		problem(w, 500, "database error")
+		return
+	}
+	if len(known) == 0 {
+		problem(w, 400, "unknown manufacturer; add it first")
 		return
 	}
 	if err := a.DB.Exec(`INSERT INTO models(slug,brand,name,device_id,description) VALUES(?,?,?,?,?)`, v.Slug, v.Brand, v.Name, v.DeviceID, v.Description); err != nil {
