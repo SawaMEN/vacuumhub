@@ -4,7 +4,7 @@
 
 **Всего этапов: 6 · реализовано: 4 · осталось: 2.**
 
-Состояние GitHub: **этапы 1–4 завершены; программный каркас этапа 5 опубликован в `main` через [PR #8](https://github.com/SawaMEN/vacuumhub/pull/8), но аппаратные испытания остаются открытыми в [Issue #4](https://github.com/SawaMEN/vacuumhub/issues/4).** Локально пройдены Go-тесты с `-race`, `go vet`, сборка Go. [GitHub Actions (этап 4)](https://github.com/SawaMEN/vacuumhub/actions/runs/42515301018) успешно проверил Go-тесты с race detector и Docker-сборку. **На реальном VDS/VPS развёртывание ещё не проверено** (этап 6). Точные реальные аппаратные ревизии и источники нужно наполнять вручную — выдуманные варианты не добавляются.
+Состояние GitHub: **этапы 1–4 завершены; программный каркас этапа 5 опубликован в `main` через [PR #8](https://github.com/SawaMEN/vacuumhub/pull/8), но аппаратные испытания остаются открытыми в [Issue #4](https://github.com/SawaMEN/vacuumhub/issues/4).** Локально пройдены Go-тесты с `-race`, `go vet`, сборка Go. [GitHub Actions (этап 4)](https://github.com/SawaMEN/vacuumhub/actions/runs/42515301018) успешно проверил Go-тесты с race detector и Docker-сборку. **Программная часть этапа 6 слита в `main` через [PR #9](https://github.com/SawaMEN/vacuumhub/pull/9); на реальном VDS/VPS развёртывание ещё не проверено** (этап 6). Точные реальные аппаратные ревизии и источники нужно наполнять вручную — выдуманные варианты не добавляются.
 
 ## Принципы
 
