@@ -28,10 +28,10 @@ cleanup() {
 trap cleanup 0
 trap 'exit 130' HUP INT TERM
 docker run --rm -v "$TEMP_VOLUME:/data" -v "$DIR:/backup:ro" alpine:3.21 \
-    sh -ec 'cd /data; tar xzf "/backup/$1"; test -s vacuumhub.sqlite' sh "$NAME"
-# Temporary restored volume only. Running as root here avoids the mismatch
-# between temporary volume ownership and the production non-root app.
-docker run --rm --user 0 -v "$TEMP_VOLUME:/data" \
+    sh -ec 'cd /data; tar xzf "/backup/$1"; test -s vacuumhub.sqlite; chown -R 10001:10001 /data' sh "$NAME"
+# Temporary restored volume only. The verification command runs as the same
+# non-root user as production and checks the archive before this test volume is removed.
+docker run --rm --user 10001:10001 -v "$TEMP_VOLUME:/data" \
     -e DATA_DIR=/data --entrypoint /usr/local/bin/vacuumhub "$IMAGE" --verify-data
 echo "Restore drill passed: SQLite and all file hashes verified in a disposable volume."
 echo "The live VPS data volume was NOT modified."
