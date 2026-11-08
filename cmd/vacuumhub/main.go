@@ -29,6 +29,18 @@ func main() {
 		if resp.StatusCode != http.StatusOK { os.Exit(1) }
 		return
 	}
+	if len(os.Args) == 2 && os.Args[1] == "--verify-data" {
+		if err := verifyOfflineData(env("DATA_DIR", "./data")); err != nil {
+			slog.Error("offline verification failed", "error", err)
+			os.Exit(1)
+		}
+		fmt.Println("SQLite and all referenced files verified")
+		return
+	}
+	if len(os.Args) != 1 {
+		fmt.Fprintln(os.Stderr, "unknown option")
+		os.Exit(2)
+	}
 	dataDir := env("DATA_DIR", "./data")
 	if err := os.MkdirAll(dataDir, 0700); err != nil {
 		slog.Error("data dir", "error", err)
@@ -57,4 +69,17 @@ func main() {
 		slog.Error("server", "error", err)
 		os.Exit(1)
 	}
+}
+
+func verifyOfflineData(dir string) error {
+	path := filepath.Join(dir, "vacuumhub.sqlite")
+	stat, err := os.Stat(path)
+	if err != nil { return err }
+	if !stat.Mode().IsRegular() || stat.Size() == 0 {
+		return fmt.Errorf("invalid SQLite backup at %s", path)
+	}
+	db, err := store.Open(path)
+	if err != nil { return err }
+	defer db.Close()
+	return store.VerifyData(db, filepath.Join(dir, "assets"))
 }
