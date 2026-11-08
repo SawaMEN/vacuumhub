@@ -101,12 +101,24 @@ func (a *App) admin(next http.HandlerFunc) http.HandlerFunc {
 			problem(w, http.StatusTooManyRequests, "too many failed authentication attempts")
 			return
 		}
-		tokenHeader := r.Header.Get("X-Vacuumhub-Token")
-		if tokenHeader != "" { tokenHeader = "Bearer " + tokenHeader } else { tokenHeader = r.Header.Get("Authorization") }
-		if !validAdminToken(tokenHeader, a.AdminToken) {
-			a.failures.failure(source)
-			problem(w, http.StatusUnauthorized, "invalid admin token")
-			return
+		if a.AdminUsername != "" {
+			if !a.basicAuthenticated(r) {
+				a.failures.failure(source)
+				a.basicChallenge(w)
+				return
+			}
+			if !nativeRequestAllowed(r) {
+				problem(w, http.StatusForbidden, "admin request must originate from this site")
+				return
+			}
+		} else {
+			tokenHeader := r.Header.Get("X-Vacuumhub-Token")
+			if tokenHeader != "" { tokenHeader = "Bearer " + tokenHeader } else { tokenHeader = r.Header.Get("Authorization") }
+			if !validAdminToken(tokenHeader, a.AdminToken) {
+				a.failures.failure(source)
+				problem(w, http.StatusUnauthorized, "invalid admin token")
+				return
+			}
 		}
 		a.failures.success(source)
 		if r.Method == http.MethodGet {
