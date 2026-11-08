@@ -334,10 +334,11 @@ install_native(){
   fi
  fi
  backup_old
- # For routine upgrades, preserve certificates and access choices.
+ CHANGED=1
+ # Certificate setup also changes live system files, therefore rollback must
+ # already be armed before generating or copying new keys.
  if [[ "$action" != update || ! -f "$ENV_FILE" ]];then prepare_tls;fi
  write_environment "$TMP/environment"
- CHANGED=1
  if [[ "$action" == install || "$action" == update ]];then
   install -m 0755 "$TMP/dist/vacuumhub" "$BIN.new"
   mv -f "$BIN.new" "$BIN"
