@@ -16,6 +16,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/SawaMEN/vacuumhub/internal/store"
@@ -28,6 +29,7 @@ var idRE = regexp.MustCompile(`^[a-f0-9]{32}$`)
 
 type App struct {
 	DB                             *store.DB
+	firmwareMu                     sync.Mutex
 	StorageDir, AdminToken, WebDir string
 }
 
