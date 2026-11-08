@@ -31,6 +31,8 @@ func (db *DB) Migrate() error {
          WHEN OLD.region<>NEW.region OR OLD.hardware_revision<>NEW.hardware_revision
          BEGIN UPDATE variant_identifiers SET verification='unverified' WHERE variant_id=NEW.id; END`,
 		`CREATE INDEX IF NOT EXISTS idx_assets_discovery ON assets(kind,status,model_slug,created_at)`,
+		`CREATE TABLE IF NOT EXISTS firmware_events (id INTEGER PRIMARY KEY AUTOINCREMENT,asset_id TEXT NOT NULL REFERENCES assets(id) ON DELETE RESTRICT,event TEXT NOT NULL,detail TEXT NOT NULL DEFAULT '',created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)`,
+		`CREATE INDEX IF NOT EXISTS idx_firmware_events_asset ON firmware_events(asset_id,id)`,
 	} {
 		if err := db.Exec(sql); err != nil {
 			return fmt.Errorf("migration: %w", err)
@@ -54,6 +56,18 @@ func (db *DB) Migrate() error {
 		{"preview_sha256", `ALTER TABLE assets ADD COLUMN preview_sha256 TEXT NOT NULL DEFAULT ''`},
 		{"preview_size_bytes", `ALTER TABLE assets ADD COLUMN preview_size_bytes INTEGER NOT NULL DEFAULT 0`},
 		{"preview_mime", `ALTER TABLE assets ADD COLUMN preview_mime TEXT NOT NULL DEFAULT ''`},
+		{"firmware_variant_id", `ALTER TABLE assets ADD COLUMN firmware_variant_id TEXT NOT NULL DEFAULT ''`},
+		{"firmware_source_url", `ALTER TABLE assets ADD COLUMN firmware_source_url TEXT NOT NULL DEFAULT ''`},
+		{"firmware_source_name", `ALTER TABLE assets ADD COLUMN firmware_source_name TEXT NOT NULL DEFAULT ''`},
+		{"firmware_rights", `ALTER TABLE assets ADD COLUMN firmware_rights TEXT NOT NULL DEFAULT ''`},
+		{"firmware_evidence_url", `ALTER TABLE assets ADD COLUMN firmware_evidence_url TEXT NOT NULL DEFAULT ''`},
+		{"firmware_downgrade_policy", `ALTER TABLE assets ADD COLUMN firmware_downgrade_policy TEXT NOT NULL DEFAULT 'unknown'`},
+		{"firmware_signer", `ALTER TABLE assets ADD COLUMN firmware_signer TEXT NOT NULL DEFAULT ''`},
+		{"firmware_signature_hex", `ALTER TABLE assets ADD COLUMN firmware_signature_hex TEXT NOT NULL DEFAULT ''`},
+		{"firmware_authenticity", `ALTER TABLE assets ADD COLUMN firmware_authenticity TEXT NOT NULL DEFAULT 'unverified'`},
+		{"firmware_compatibility", `ALTER TABLE assets ADD COLUMN firmware_compatibility TEXT NOT NULL DEFAULT 'unverified'`},
+		{"firmware_scan_status", `ALTER TABLE assets ADD COLUMN firmware_scan_status TEXT NOT NULL DEFAULT 'not_scanned'`},
+		{"firmware_inspection", `ALTER TABLE assets ADD COLUMN firmware_inspection TEXT NOT NULL DEFAULT 'unchecked'`},
 	} {
 		if !existing[column.name] {
 			if err := db.Exec(column.sql); err != nil {
@@ -65,6 +79,12 @@ func (db *DB) Migrate() error {
 		return err
 	}
 	if err := db.Exec(`CREATE UNIQUE INDEX IF NOT EXISTS idx_voicepack_approved_version ON assets(model_slug,series_slug,language,version) WHERE kind='voicepack' AND status='approved' AND series_slug<>''`); err != nil {
+		return err
+	}
+	if err := db.Exec(`CREATE UNIQUE INDEX IF NOT EXISTS idx_firmware_approved_version ON assets(firmware_variant_id,version,channel) WHERE kind='firmware' AND status='approved' AND firmware_variant_id<>''`); err != nil {
+		return err
+	}
+	if err := db.Exec(`CREATE INDEX IF NOT EXISTS idx_firmware_variant_history ON assets(firmware_variant_id,channel,status,created_at)`); err != nil {
 		return err
 	}
 	return nil

@@ -37,6 +37,47 @@ async function refresh() {
     const card=element('div','review-card');
     card.append(element('strong','',asset.title),element('p','small muted',asset.kind+' · '+asset.model_slug+' · '+asset.original_filename),element('code','checksum',asset.sha256));
     if(asset.kind==='voicepack')card.append(element('p','small muted','Автор: '+(asset.author || 'не указан')+' · Лицензия: '+(asset.license || 'не указана')+' · Серия: '+(asset.series_slug || 'старый пакет')+' · Формат: '+(asset.package_format || 'не проверен')+(asset.has_preview?' · С аудиодемо':'')));
+
+    if(asset.kind==='firmware') {
+      card.append(element('p','small muted','Перед публикацией обязательны источник, права распространения, аппаратная ревизия с идентификатором и сканирование ClamAV. Это не подтверждает безопасность установки.'));
+      const form=element('form','firmware-meta');
+      const fields=[
+        ['variant_id','ID аппаратного варианта (из каталога)','firmware_variant_id'],
+        ['source_name','Издатель / источник','firmware_source_name'],
+        ['source_url','HTTPS ссылка на источник прошивки','firmware_source_url'],
+        ['license','Лицензия / разрешение','license'],
+        ['rights_statement','Подтверждение права распространения','firmware_rights'],
+        ['evidence_url','HTTPS источник связи прошивки с ревизией','firmware_evidence_url'],
+        ['signer','ID доверенного ключа (необязательно)','firmware_signer'],
+        ['signature_hex','Ed25519 подпись SHA-256, hex (необязательно)','firmware_signature_hex']
+      ];
+      for(const [name,title,key] of fields){
+        const l=element('label','',title),input=element('input');
+        input.name=name;input.value=asset[key]||'';
+        input.required=!['signer','signature_hex'].includes(name);
+        if(name.endsWith('_url'))input.type='url';
+        input.maxLength=['source_url','evidence_url'].includes(name)?500:name==='rights_statement'?1000:128;
+        l.append(input);form.append(l);
+      }
+      const label=element('label','','Политика отката');
+      const select=element('select');select.name='downgrade_policy';
+      for(const [value,title] of [['unknown','Неизвестна'],['forbidden','Запрещён'],['documented','Описана источником']]){
+        const opt=element('option','',title);opt.value=value;
+        opt.selected=value===(asset.firmware_downgrade_policy||'unknown');select.append(opt);
+      }
+      label.append(select);form.append(label);
+      const save=element('button','secondary','Сохранить сведения о прошивке');
+      save.type='submit';form.append(save);
+      form.addEventListener('submit',async(event)=>{
+        event.preventDefault();save.disabled=true;
+        try{
+          await api('admin/firmware/'+asset.id+'/metadata',{method:'PATCH',body:JSON.stringify(Object.fromEntries(new FormData(form)))});
+          notify('Сведения сохранены; можно проводить модерацию после настройки антивируса.',true);await refresh();
+        }catch(error){notify(error.message);}finally{save.disabled=false;}
+      });
+      card.append(form);
+    }
+
     const buttons=element('div','review-actions');
     for (const [action,label] of [['approved','Опубликовать'],['rejected','Отклонить']]) {
       const b=element('button',action==='approved'?'primary':'secondary',label);
