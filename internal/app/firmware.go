@@ -24,7 +24,7 @@ import (
 
 // Firmware is deliberately catalogued, not installed. A documented mapping to
 // a device revision does not mean the package is safe to flash to that device.
-const firmwareColumns = assetColumns + `,firmware_variant_id,firmware_source_url,firmware_source_name,firmware_rights,firmware_evidence_url,firmware_downgrade_policy,firmware_signer,firmware_authenticity,firmware_compatibility,firmware_scan_status,firmware_inspection`
+const firmwareColumns = assetColumns + `,firmware_variant_id,firmware_source_url,firmware_source_name,firmware_rights,firmware_evidence_url,firmware_downgrade_policy,firmware_signer,firmware_signature_hex,firmware_authenticity,firmware_compatibility,firmware_scan_status,firmware_inspection`
 
 type firmwareMetadata struct {
 	VariantID       string `json:"variant_id"`
