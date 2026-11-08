@@ -79,10 +79,40 @@ function assetCard(item) {
   top.append(label(model ? model.name : item.model_slug));
   if (item.language) top.append(label(item.language));
   if (item.region) top.append(label('Регион: ' + item.region));
+  if (item.kind === 'voicepack' && item.author) top.append(label('Автор: ' + item.author));
+  if (item.kind === 'voicepack' && item.license) top.append(label('Лицензия: ' + item.license));
   if (item.kind === 'firmware') top.append(label('Совместимость не подтверждена'));
   card.append(top, node('h3', '', item.title));
   const details = item.version ? 'Версия: ' + item.version : 'Голосовой пакет';
   card.append(node('p', 'muted', details + (item.notes ? ' · ' + item.notes : '')));
+  if (item.kind === 'voicepack' && item.has_preview) {
+    const player=node('audio','voice-preview');
+    player.controls=true;
+    player.preload='none';
+    player.src='/api/v1/assets/'+encodeURIComponent(item.id)+'/preview';
+    player.setAttribute('aria-label','Предпрослушивание: '+item.title);
+    card.append(player);
+  }
+  if (item.kind === 'voicepack' && item.series_slug) {
+    const history=node('button','text-button','История версий');
+    history.addEventListener('click',async()=>{
+      const old=card.querySelector('.voice-history');
+      if (old) {old.remove();return;}
+      const box=node('div','voice-history','Загрузка…');
+      card.append(box);
+      try {
+        const versions=await request('/api/v1/voicepacks/'+encodeURIComponent(item.id)+'/versions');
+        box.replaceChildren(node('strong','','Версии серии:'));
+        for (const v of versions) {
+          const line=node('p','muted','Версия '+v.version+' · '+(v.author || 'автор не указан')+' · ');
+          const link=node('a','','Скачать');
+          link.href='/api/v1/assets/'+encodeURIComponent(v.id)+'/download';
+          link.rel='nofollow';line.append(link);box.append(line);
+        }
+      }catch(err){box.textContent=err.message;}
+    });
+    card.append(history);
+  }
   const footer = node('div', 'card-bottom');
   footer.append(node('span', 'mono', (item.size_bytes / (1024 * 1024)).toFixed(1) + ' МБ · SHA-256: ' + item.sha256.slice(0, 12) + '…'));
   const download = node('a', 'download', 'Скачать ↓');

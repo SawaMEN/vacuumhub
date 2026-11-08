@@ -51,6 +51,8 @@ func (a *App) Handler() http.Handler {
 	mux.HandleFunc("POST /api/v1/admin/catalog/import", a.admin(a.importCatalog))
 	mux.HandleFunc("GET /api/v1/models/{slug}", a.model)
 	mux.HandleFunc("GET /api/v1/voicepacks", a.publicAssets("voicepack"))
+	mux.HandleFunc("GET /api/v1/voicepacks/{id}/versions", a.voiceHistory)
+	mux.HandleFunc("GET /api/v1/assets/{id}/preview", a.preview)
 	mux.HandleFunc("GET /api/v1/firmware", a.publicAssets("firmware"))
 	mux.HandleFunc("GET /api/v1/assets/{id}/download", a.download)
 	mux.HandleFunc("POST /api/v1/admin/models", a.admin(a.createModel))
@@ -127,7 +129,7 @@ func (a *App) model(w http.ResponseWriter, r *http.Request) {
 	reply(w, 200, rows[0])
 }
 
-const assetColumns = `id,kind,model_slug,title,version,language,region,channel,notes,original_filename,size_bytes,sha256,status,created_at`
+const assetColumns = `id,kind,model_slug,title,version,language,region,channel,notes,original_filename,size_bytes,sha256,status,created_at,author,license,series_slug,package_format,preview_size_bytes,preview_mime,CASE WHEN preview_storage_filename<>'' THEN 1 ELSE 0 END AS has_preview`
 
 func (a *App) publicAssets(kind string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -196,7 +198,7 @@ func allowedFile(kind, filename string) bool {
 	return false
 }
 func (a *App) upload(w http.ResponseWriter, r *http.Request) {
-	r.Body = http.MaxBytesReader(w, r.Body, maxUpload+(2<<20))
+	r.Body = http.MaxBytesReader(w, r.Body, maxUpload+maxPreview+(2<<20))
 	if err := r.ParseMultipartForm(4 << 20); err != nil {
 		problem(w, 413, "multipart form too large or invalid")
 		return
@@ -212,6 +214,13 @@ func (a *App) upload(w http.ResponseWriter, r *http.Request) {
 	region := clean(r.FormValue("region"), 40)
 	channel := clean(r.FormValue("channel"), 40)
 	notes := clean(r.FormValue("notes"), 5000)
+	author := clean(r.FormValue("author"), 120)
+	license := clean(r.FormValue("license"), 120)
+	series := clean(r.FormValue("series_slug"), 100)
+	if kind == "voicepack" && (!slugRE.MatchString(series) || author == "" || license == "" || version == "") {
+		problem(w, 400, "voicepack requires series_slug, author, license and version")
+		return
+	}
 	if kind != "firmware" && kind != "voicepack" || !slugRE.MatchString(model) || title == "" {
 		problem(w, 400, "invalid asset fields")
 		return
@@ -271,12 +280,55 @@ func (a *App) upload(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	sum := hex.EncodeToString(h.Sum(nil))
-	if err := a.DB.Exec(`INSERT INTO assets(id,kind,model_slug,title,version,language,region,channel,notes,original_filename,storage_filename,size_bytes,sha256,status) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,'pending')`, id, kind, model, title, version, language, region, channel, notes, filename, storageName, n, sum); err != nil {
+	packageFormat := ""
+	previewName, previewSum, previewMime := "", "", ""
+	previewSize := 0
+	if kind == "voicepack" {
+		packageFormat, err = validateVoiceArchive(filename, path, voiceManifest{model, series, version, language})
+		if err != nil {
+			problem(w, 400, "invalid voicepack archive: "+err.Error())
+			return
+		}
+		// Preview audio is separate from the installable archive and is never executed.
+		previewFile, previewHeader, previewErr := r.FormFile("preview")
+		if previewErr != nil && !errors.Is(previewErr, http.ErrMissingFile) {
+			problem(w, 400, "invalid preview")
+			return
+		}
+		if previewErr == nil {
+			previewFilename := filepath.Base(strings.ReplaceAll(previewHeader.Filename, "\\", "/"))
+			data, media, checksum, e := readPreview(previewFile, previewFilename)
+			_ = previewFile.Close()
+			if e != nil {
+				problem(w, 400, e.Error())
+				return
+			}
+			previewName = id + ".preview"
+			if e := os.WriteFile(filepath.Join(a.StorageDir, previewName), data, 0600); e != nil {
+				_ = os.Remove(filepath.Join(a.StorageDir, previewName))
+				problem(w, 500, "preview storage error")
+				return
+			}
+			previewMime, previewSum, previewSize = media, checksum, len(data)
+		}
+	} else if ff, _, e := r.FormFile("preview"); e == nil {
+		_ = ff.Close()
+		problem(w, 400, "preview only available for voicepacks")
+		return
+	}
+	previewSaved := false
+	defer func() {
+		if !previewSaved && previewName != "" {
+			_ = os.Remove(filepath.Join(a.StorageDir, previewName))
+		}
+	}()
+	if err := a.DB.Exec(`INSERT INTO assets(id,kind,model_slug,title,version,language,region,channel,notes,original_filename,storage_filename,size_bytes,sha256,status,author,license,series_slug,package_format,preview_storage_filename,preview_sha256,preview_size_bytes,preview_mime) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,'pending',?,?,?,?,?,?,?,?)`, id, kind, model, title, version, language, region, channel, notes, filename, storageName, n, sum, author, license, series, packageFormat, previewName, previewSum, previewSize, previewMime); err != nil {
 		slog.Error("insert asset", "error", err)
 		problem(w, 500, "database error")
 		return
 	}
 	saved = true
+	previewSaved = true
 	reply(w, 201, map[string]any{"id": id, "sha256": sum, "size_bytes": n, "status": "pending"})
 }
 func (a *App) adminAssets(w http.ResponseWriter, r *http.Request) {
@@ -306,7 +358,7 @@ func (a *App) review(w http.ResponseWriter, r *http.Request) {
 		problem(w, 400, "status must be approved or rejected")
 		return
 	}
-	rows, err := a.DB.Query(`SELECT storage_filename,sha256,status FROM assets WHERE id=?`, id)
+	rows, err := a.DB.Query(`SELECT storage_filename,sha256,status,kind,original_filename,preview_storage_filename,preview_sha256,preview_mime,series_slug,model_slug,language,version FROM assets WHERE id=?`, id)
 	if err != nil {
 		problem(w, 500, "database error")
 		return
@@ -332,8 +384,30 @@ func (a *App) review(w http.ResponseWriter, r *http.Request) {
 			problem(w, 409, "file checksum mismatch")
 			return
 		}
+		if rows[0]["kind"] == "voicepack" {
+			if _, e = validateVoiceArchive(rows[0]["original_filename"].(string), filepath.Join(a.StorageDir, rows[0]["storage_filename"].(string)), voiceManifest{rows[0]["model_slug"].(string), rows[0]["series_slug"].(string), rows[0]["version"].(string), rows[0]["language"].(string)}); e != nil {
+				problem(w, 409, "voicepack archive failed validation")
+				return
+			}
+			if previewName := rows[0]["preview_storage_filename"].(string); previewName != "" {
+				data, e := os.ReadFile(filepath.Join(a.StorageDir, previewName))
+				if e != nil || len(data) > maxPreview || len(data) == 0 {
+					problem(w, 409, "preview missing or invalid")
+					return
+				}
+				sum := sha256.Sum256(data)
+				if hex.EncodeToString(sum[:]) != rows[0]["preview_sha256"] {
+					problem(w, 409, "preview checksum mismatch")
+					return
+				}
+			}
+		}
 	}
 	if err := a.DB.Exec(`UPDATE assets SET status=? WHERE id=? AND status='pending'`, v.Status, id); err != nil {
+		if strings.Contains(err.Error(), "UNIQUE constraint failed") {
+			problem(w, 409, "this voicepack version is already published")
+			return
+		}
 		problem(w, 500, "database error")
 		return
 	}

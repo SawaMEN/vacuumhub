@@ -1,6 +1,7 @@
 package app
 
 import (
+	"archive/zip"
 	"bytes"
 	"encoding/json"
 	"io"
@@ -71,7 +72,7 @@ func TestUploadModerateAndDownload(t *testing.T) {
 	a, h := testApp(t)
 	var buf bytes.Buffer
 	mw := multipart.NewWriter(&buf)
-	fields := map[string]string{"kind": "voicepack", "model_slug": "roborock-s5", "title": "Тестовая озвучка", "language": "ru"}
+	fields := map[string]string{"kind": "voicepack", "model_slug": "roborock-s5", "title": "Тестовая озвучка", "language": "ru", "series_slug": "roborock-s5-ru", "version": "1.0", "author": "Tester", "license": "CC-BY-4.0"}
 	for k, v := range fields {
 		if err := mw.WriteField(k, v); err != nil {
 			t.Fatal(err)
@@ -81,7 +82,19 @@ func TestUploadModerateAndDownload(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	fileBytes := []byte("PK\x03\x04test data")
+	var zipped bytes.Buffer
+	z := zip.NewWriter(&zipped)
+	entry, e := z.Create("sample.txt")
+	if e != nil {
+		t.Fatal(e)
+	}
+	if _, e = entry.Write([]byte("demo audio package")); e != nil {
+		t.Fatal(e)
+	}
+	if e = z.Close(); e != nil {
+		t.Fatal(e)
+	}
+	fileBytes := zipped.Bytes()
 	if _, err := f.Write(fileBytes); err != nil {
 		t.Fatal(err)
 	}

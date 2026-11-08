@@ -36,6 +36,37 @@ func (db *DB) Migrate() error {
 			return fmt.Errorf("migration: %w", err)
 		}
 	}
+	// Additive columns preserve existing assets for upgraded installations.
+	existing := make(map[string]bool)
+	cols, err := db.Query(`PRAGMA table_info(assets)`)
+	if err != nil {
+		return err
+	}
+	for _, col := range cols {
+		existing[col["name"].(string)] = true
+	}
+	for _, column := range []struct{ name, sql string }{
+		{"author", `ALTER TABLE assets ADD COLUMN author TEXT NOT NULL DEFAULT ''`},
+		{"license", `ALTER TABLE assets ADD COLUMN license TEXT NOT NULL DEFAULT ''`},
+		{"series_slug", `ALTER TABLE assets ADD COLUMN series_slug TEXT NOT NULL DEFAULT ''`},
+		{"package_format", `ALTER TABLE assets ADD COLUMN package_format TEXT NOT NULL DEFAULT ''`},
+		{"preview_storage_filename", `ALTER TABLE assets ADD COLUMN preview_storage_filename TEXT NOT NULL DEFAULT ''`},
+		{"preview_sha256", `ALTER TABLE assets ADD COLUMN preview_sha256 TEXT NOT NULL DEFAULT ''`},
+		{"preview_size_bytes", `ALTER TABLE assets ADD COLUMN preview_size_bytes INTEGER NOT NULL DEFAULT 0`},
+		{"preview_mime", `ALTER TABLE assets ADD COLUMN preview_mime TEXT NOT NULL DEFAULT ''`},
+	} {
+		if !existing[column.name] {
+			if err := db.Exec(column.sql); err != nil {
+				return fmt.Errorf("migration %s: %w", column.name, err)
+			}
+		}
+	}
+	if err := db.Exec(`CREATE INDEX IF NOT EXISTS idx_voicepack_history ON assets(kind,model_slug,series_slug,language,status,created_at)`); err != nil {
+		return err
+	}
+	if err := db.Exec(`CREATE UNIQUE INDEX IF NOT EXISTS idx_voicepack_approved_version ON assets(model_slug,series_slug,language,version) WHERE kind='voicepack' AND status='approved' AND series_slug<>''`); err != nil {
+		return err
+	}
 	return nil
 }
 

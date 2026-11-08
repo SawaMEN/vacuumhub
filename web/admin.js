@@ -36,6 +36,7 @@ async function refresh() {
   for (const asset of assets) {
     const card=element('div','review-card');
     card.append(element('strong','',asset.title),element('p','small muted',asset.kind+' · '+asset.model_slug+' · '+asset.original_filename),element('code','checksum',asset.sha256));
+    if(asset.kind==='voicepack')card.append(element('p','small muted','Автор: '+(asset.author || 'не указан')+' · Лицензия: '+(asset.license || 'не указана')+' · Серия: '+(asset.series_slug || 'старый пакет')+' · Формат: '+(asset.package_format || 'не проверен')+(asset.has_preview?' · С аудиодемо':'')));
     const buttons=element('div','review-actions');
     for (const [action,label] of [['approved','Опубликовать'],['rejected','Отклонить']]) {
       const b=element('button',action==='approved'?'primary':'secondary',label);
@@ -77,3 +78,17 @@ document.getElementById('variant-form').addEventListener('submit',async(e)=>{
     notify('Ревизия и идентификатор сохранены',true);e.target.reset();await refresh();
   }catch(err){notify(err.message);}
 });
+
+// Keep firmware metadata separate from voicepack-only fields.
+const kindSelect=document.querySelector('#asset-form select[name="kind"]');
+const voiceFields=document.getElementById('voicepack-fields');
+function changeKind(){
+  const voice=kindSelect.value==='voicepack';
+  voiceFields.hidden=!voice;
+  for(const name of ['series_slug','author','license'])document.querySelector('#asset-form [name="'+name+'"]').required=voice;
+  document.querySelector('#asset-form [name="language"]').required=voice;
+  document.querySelector('#asset-form [name="version"]').required=true;
+  document.querySelector('#asset-form [name="region"]').required=!voice;
+  document.querySelector('#asset-form [name="file"]').accept=voice?'.zip,.tar.gz,.tgz':'.zip,.pkg,.tar.gz,.tgz,.bin,.img';
+}
+kindSelect.addEventListener('change',changeKind);changeKind();

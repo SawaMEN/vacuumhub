@@ -15,3 +15,5 @@
 @media(max-width:1050px){.model-advanced{grid-template-columns:repeat(3,minmax(0,1fr))}}
 @media(max-width:650px){.model-advanced{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:450px){.model-advanced{grid-template-columns:1fr}}
+
+.voice-preview{width:100%;margin:3px 0 16px;height:42px;max-width:100%}.voice-history{border-top:1px solid var(--line);padding:12px 0;margin-top:14px}.voice-history p{margin:9px 0}.voice-history a{color:var(--accent);font-weight:700}#voicepack-fields[hidden]{display:none}
