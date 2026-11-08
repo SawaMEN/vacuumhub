@@ -26,6 +26,15 @@ check_system(){
   command -v "$tool" >/dev/null || die "Не найдена команда $tool."
  done
 }
+pkg_install(){
+ if command -v apt-get >/dev/null 2>&1;then
+  apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y "$@"
+ elif command -v dnf >/dev/null 2>&1;then dnf install -y "$@"
+ elif command -v yum >/dev/null 2>&1;then yum install -y "$@"
+ elif command -v pacman >/dev/null 2>&1;then pacman -S --needed --noconfirm "$@"
+ elif command -v zypper >/dev/null 2>&1;then zypper --non-interactive install "$@"
+ else die 'Поддерживаемый пакетный менеджер не найден.';fi
+}
 get_config(){
  local key="$1"
  [[ -f "$ENV_FILE" ]] || return 0
@@ -175,7 +184,10 @@ prepare_tls(){
   install_cert_copy "$TLS_CERT_SOURCE" "$TLS_KEY_SOURCE"
   CERT_NAME=''
  else
-  command -v certbot >/dev/null || die 'Не найден Certbot. Установите его или выберите самоподписанный сертификат.'
+  if ! command -v certbot >/dev/null 2>&1;then
+   echo 'Устанавливаем Certbot для выпуска HTTPS-сертификата...'
+   pkg_install certbot || die 'Не удалось установить Certbot.'
+  fi
   if [[ "$ACCESS_MODE" == ip ]];then
     local help
     help="$(certbot --help all)"
