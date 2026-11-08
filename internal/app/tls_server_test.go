@@ -76,6 +76,7 @@ func TestNativeAccessModesAndCertificateSAN(t *testing.T){
  if _,err:=NativeConfigFromEnv();err==nil{t.Fatal("domain accepted in IP mode")}
 }
 func TestNativeNoPlainHTTPFallback(t *testing.T) {
+ t.Setenv("ADMIN_API_TOKEN",testToken)
  t.Setenv("ACCESS_MODE","")
  t.Setenv("PUBLIC_HOST","")
  t.Setenv("ADMIN_BASIC_USER","admin")
