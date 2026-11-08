@@ -39,6 +39,8 @@ type firmwareMetadata struct {
 }
 
 func (a *App) firmwareMetadata(w http.ResponseWriter, r *http.Request) {
+	a.firmwareMu.Lock()
+	defer a.firmwareMu.Unlock()
 	id := r.PathValue("id")
 	if !idRE.MatchString(id) {
 		problem(w, 400, "invalid asset ID")
@@ -194,6 +196,8 @@ func (a *App) firmwareVersions(w http.ResponseWriter, r *http.Request) {
 }
 
 func (a *App) reviewFirmware(id, status string) error {
+	a.firmwareMu.Lock()
+	defer a.firmwareMu.Unlock()
 	rows, err := a.DB.Query(`SELECT model_slug,version,region,channel,storage_filename,
 		original_filename,sha256,license,firmware_variant_id,firmware_source_url,
 		firmware_source_name,firmware_rights,firmware_evidence_url,
