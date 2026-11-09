@@ -42,6 +42,8 @@ fi
 bash -n "$ROOT/install.sh"
 bash -n "$ROOT/deploy/vacuumhub"
 bash -n "$ROOT/scripts/backup-native.sh"
+# Backup names must include the process ID to avoid same-second collisions.
+grep -Fq '$.tar.gz' "$ROOT/scripts/backup-native.sh"
 bash -n "$ROOT/scripts/restore-drill-native.sh"
 bash -n "$ROOT/scripts/restore-native.sh"
 echo 'Native installer choice, validation and shell syntax tests passed.'

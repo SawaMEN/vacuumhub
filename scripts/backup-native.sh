@@ -23,7 +23,7 @@ trap cleanup EXIT
 trap 'exit 130' INT TERM HUP
 if [[ "$ACTIVE" == 1 ]]; then systemctl stop "$SERVICE";fi
 [[ -s "$DATA_DIR/vacuumhub.sqlite" ]] || { echo 'Database missing after stop.' >&2; exit 1; }
-name="vacuumhub-$(date -u +%Y%m%dT%H%M%SZ)-$.tar.gz"
+name="vacuumhub-$(date -u +%Y%m%dT%H%M%SZ)-$$.tar.gz"
 tmp="$OUT/$name.part"
 
 tar -C "$DATA_DIR" -czf "$tmp" .
