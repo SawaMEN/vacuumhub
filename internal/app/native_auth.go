@@ -19,7 +19,12 @@ func loadBasicCredentials()(string,string,error){
  if user=="" && encoded=="" {return "","",nil}
  if !basicUserRE.MatchString(user)||encoded=="" {return "","",errors.New("invalid ADMIN_BASIC_USER or missing password")}
  raw,err:=base64.StdEncoding.DecodeString(encoded)
- if err!=nil||len(raw)<12||len(raw)>256 {return "","",errors.New("ADMIN_BASIC_PASSWORD_B64 must decode to 12-256 bytes")}
+ // No arbitrary complexity or minimum-length rule: the operator may use any
+ // non-empty, single-line UTF-8 password (including 1 char and punctuation).
+ // Control characters cannot be encoded safely in HTTP Basic headers.
+ if err!=nil||len(raw)==0||strings.ContainsAny(string(raw),"\r\n\x00") {
+  return "","",errors.New("ADMIN_BASIC_PASSWORD_B64 must decode to a nonempty single-line password")
+ }
  return user,string(raw),nil
 }
 func (a *App) basicAuthenticated(r *http.Request)bool{
