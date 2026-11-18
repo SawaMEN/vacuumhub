@@ -64,7 +64,10 @@ ask_password(){
  fi
  # Accept any non-empty single-line password, including one character,
  # whitespace, colons, symbols and Unicode. An empty Enter generates a random one.
- [[ -n "$text" && "$text" != *
+ [[ -n "$text" ]] || die 'Пароль не может быть пустым.'
+ case "$text" in
+  *$'\n'*|*$'\r'*) die 'Пароль не должен содержать перевод строки.';;
+ esac
  PASSWORD_B64="$(printf '%s' "$text" | base64 | tr -d '\r\n')"
 }
 valid_port(){
