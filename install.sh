@@ -195,7 +195,8 @@ prepare_tls(){
     -keyout "$TMP/cert-key.pem" -out "$TMP/cert.pem" >/dev/null 2>&1 || die 'Не удалось создать TLS сертификат.'
   install_cert_copy "$TMP/cert.pem" "$TMP/cert-key.pem"
   CERT_NAME=''
-  echo 'ВНИМАНИЕ: самоподписанный сертификат не доверен браузером по умолчанию.'
+  echo 'HTTPS: создан самоподписанный сертификат. Это предупреждение, а не ошибка запуска.'
+  echo 'Браузер не будет доверять сертификату без ручной настройки. Для доверенного сертификата выберите Let’s Encrypt.'
  elif [[ "$TLS_MODE" == existing ]];then
   install_cert_copy "$TLS_CERT_SOURCE" "$TLS_KEY_SOURCE"
   CERT_NAME=''
