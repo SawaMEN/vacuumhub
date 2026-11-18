@@ -49,6 +49,34 @@ func TestNativeBasicProtectsPageAndAPI(t *testing.T){
  req=makeRequest("GET","/admin.html","",true,false,"")
  if req.Header().Get("Cache-Control")!="no-store"{t.Fatal("admin HTML cacheable")}
 }
+func TestNativeAcceptsCustomPasswordsWithoutLengthAndCharacterRestrictions(t *testing.T) {
+ t.Setenv("ADMIN_BASIC_USER", "vacadmin")
+ cases := []string{
+  "a", ":", "#", "hello world", " space at both ends ",
+  "S:!#@'\\\"+-_[]{}=;?", "пароль", "🔒漢字テスト",
+  strings.Repeat("x", 900),
+ }
+ for _, password := range cases {
+  t.Run("length_and_prefix_"+string(rune(len([]rune(password))+'A')), func(t *testing.T) {
+   t.Setenv("ADMIN_BASIC_PASSWORD_B64", base64.StdEncoding.EncodeToString([]byte(password)))
+   username, got, err := loadBasicCredentials()
+   if err!=nil || username!="vacadmin" || got!=password {
+    t.Fatalf("password not round-tripped (length=%d): %v",len(password),err)
+   }
+   a:=&App{AdminUsername:username,AdminPassword:got}
+   req:=httptest.NewRequest("GET","https://example.com/admin.html",nil)
+   req.SetBasicAuth(username,password)
+   if !a.basicAuthenticated(req) {t.Fatal("HTTP Basic rejected custom password")}
+  })
+ }
+ for _, password := range []string{"", "line\nbreak", "line\rbreak", "nul\x00byte"} {
+  t.Setenv("ADMIN_BASIC_PASSWORD_B64",base64.StdEncoding.EncodeToString([]byte(password)))
+  if _,_,err:=loadBasicCredentials();err==nil {
+   t.Fatal("empty or control-character password must fail")
+  }
+ }
+}
+
 func TestNativeCredentialsRequiredAndMalformedRejected(t *testing.T){
  t.Setenv("ADMIN_BASIC_USER","test")
  t.Setenv("ADMIN_BASIC_PASSWORD_B64","invalid")
