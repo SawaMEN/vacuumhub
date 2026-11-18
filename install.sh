@@ -62,8 +62,12 @@ ask_password(){
   text="$(openssl rand -hex 20)"
   GENERATED_PASSWORD="$text"
  fi
- [[ ${#text} -ge 12 && ${#text} -le 256 && "$text" != *$'\n'* && "$text" != *$'\r'* ]] ||
-   die 'Пароль должен содержать от 12 до 256 символов и не иметь перевода строки.'
+ # Any nonempty single-line password is accepted, including short, Unicode, spaces.
+ # Empty Enter generates a random password instead of allowing blank auth.
+ [[ -n "$text" ]] || die 'Пароль не может быть пустым.'
+ case "$text" in
+  *$'\n'*|*$'\r'*) die 'Пароль не должен содержать перевод строки.';;
+ esac
  PASSWORD_B64="$(printf '%s' "$text" | base64 | tr -d '\r\n')"
 }
 valid_port(){
@@ -154,10 +158,23 @@ prepare_directories(){
   useradd --system --home-dir "$STATE_DIR" --shell /usr/sbin/nologin --user-group vacuumhub
  fi
  install -d -m 0755 "$INSTALL_DIR"
- install -d -m 0700 "$CONFIG_DIR" "$STATE_DIR"
+ # Non-root systemd service needs traverse rights to open TLS key/cert.
+ # The environment file is still root-only (0600).
+ install -d -m 0750 -o root -g vacuumhub "$CONFIG_DIR"
  install -d -m 0750 -o root -g vacuumhub "$CERT_DIR"
+ install -d -m 0700 -o vacuumhub -g vacuumhub "$STATE_DIR"
  install -d -m 0700 /var/log/vacuumhub
- chown vacuumhub:vacuumhub "$STATE_DIR"
+ # Repair older installations with root-only parent or 0600 TLS key.
+ if [[ -e "$CERT_DIR/cert.pem" ]];then
+  [[ -f "$CERT_DIR/cert.pem" && ! -L "$CERT_DIR/cert.pem" ]] || die 'Небезопасный путь сертификата.'
+  chown root:vacuumhub "$CERT_DIR/cert.pem"
+  chmod 0644 "$CERT_DIR/cert.pem"
+ fi
+ if [[ -e "$CERT_DIR/key.pem" ]];then
+  [[ -f "$CERT_DIR/key.pem" && ! -L "$CERT_DIR/key.pem" ]] || die 'Небезопасный путь TLS-ключа.'
+  chown root:vacuumhub "$CERT_DIR/key.pem"
+  chmod 0640 "$CERT_DIR/key.pem"
+ fi
 }
 install_cert_copy(){
  local original="$1" original_key="$2"
@@ -179,7 +196,8 @@ prepare_tls(){
     -keyout "$TMP/cert-key.pem" -out "$TMP/cert.pem" >/dev/null 2>&1 || die 'Не удалось создать TLS сертификат.'
   install_cert_copy "$TMP/cert.pem" "$TMP/cert-key.pem"
   CERT_NAME=''
-  echo 'ВНИМАНИЕ: самоподписанный сертификат не доверен браузером по умолчанию.'
+  echo 'HTTPS: создан самоподписанный сертификат. Это предупреждение, а не ошибка запуска.'
+  echo 'Браузер не доверяет ему без ручной настройки. Для доверенного сертификата выберите Let’s Encrypt.'
  elif [[ "$TLS_MODE" == existing ]];then
   install_cert_copy "$TLS_CERT_SOURCE" "$TLS_KEY_SOURCE"
   CERT_NAME=''
@@ -361,7 +379,12 @@ install_native(){
  else
   systemctl disable --now vacuumhub-cert-renew.timer >/dev/null 2>&1 || true
  fi
- systemctl restart vacuumhub.service
+ if ! systemctl restart vacuumhub.service;then
+  echo 'Не удалось запустить VacuumHub. Подробности из systemd:' >&2
+  systemctl --no-pager --full status vacuumhub.service >&2 || true
+  journalctl -u vacuumhub.service -n 40 --no-pager >&2 || true
+  die 'Проверьте доступ к TLS-ключу и конфликт TCP-порта. Подробности выше.'
+ fi
  local i=0
  until systemctl is-active --quiet vacuumhub.service;do
   i=$((i+1));((i<12)) || die 'Не удалось запустить службу. Проверьте journalctl -u vacuumhub.'
@@ -384,6 +407,7 @@ install_native(){
 change_credentials(){
  [[ -f "$ENV_FILE" ]] || die 'Сначала установите VacuumHub.'
  check_system
+ prepare_directories
  TMP="$(mktemp -d)";CHANGED=0;SUCCESS=0;WAS_ACTIVE=0;trap cleanup_install EXIT
  ACCESS_MODE="$(get_config ACCESS_MODE)"
  PUBLIC_HOST="$(get_config PUBLIC_HOST)"

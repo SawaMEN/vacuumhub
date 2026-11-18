@@ -31,6 +31,8 @@ jobs:
       - uses: actions/checkout@v4
       - name: Test IP/domain-only menu and native scripts
         run: bash tests/native-installer.sh
+      - name: Reproduce and repair systemd TLS permissions as non-root vacuumhub
+        run: sudo bash tests/native-permissions.sh
       - name: Verify embedded manager and unit
         run: |
           grep -q 'User=vacuumhub' deploy/vacuumhub.service

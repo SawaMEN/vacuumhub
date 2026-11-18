@@ -31,6 +31,15 @@ grep -qx 'LISTEN_HOST=0.0.0.0' "$ENV_FILE"
 grep -qx 'ADMIN_BASIC_USER=testadmin' "$ENV_FILE"
 grep -qx 'LISTEN_PORT=8443' "$ENV_FILE"
 [[ "$PASSWORD_B64" == "$(printf %s "$VACUUMHUB_ADMIN_PASSWORD" | base64 | tr -d '\n')" ]]
+
+# Password choices are intentionally not subject to complexity/length rules.
+# The systemd env only stores ASCII base64, even for Unicode/shell metacharacters.
+for custom_password in 'x' ':' '!' 'a b' 'пароль 🙂' ' space : !"[] #& at both ends ';do
+  VACUUMHUB_ADMIN_PASSWORD="$custom_password"
+  config_credentials
+  [[ "$PASSWORD_B64" == "$(printf %s "$custom_password" | base64 | tr -d '\r\n')" ]]
+done
+
 VACUUMHUB_MODE=domain
 VACUUMHUB_HOST=vacuum.example.com
 VACUUMHUB_TLS_MODE=selfsigned
@@ -42,6 +51,7 @@ fi
 bash -n "$ROOT/install.sh"
 bash -n "$ROOT/deploy/vacuumhub"
 bash -n "$ROOT/scripts/backup-native.sh"
+bash -n "$ROOT/tests/native-permissions.sh"
 # Backup names must include the process ID to avoid same-second collisions.
 grep -Fq '$.tar.gz' "$ROOT/scripts/backup-native.sh"
 bash -n "$ROOT/scripts/restore-drill-native.sh"
